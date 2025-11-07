@@ -48,7 +48,4 @@ void make_level_set3(
 // Query available hardware backends
 bool is_gpu_available();
 
-// Get current backend being used (useful for Auto mode)
-HardwareBackend get_active_backend();
-
 } // namespace sdfgen

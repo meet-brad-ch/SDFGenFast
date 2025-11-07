@@ -413,14 +413,14 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
     CUDA_CHECK(cudaGetDevice(&device));
     cudaDeviceProp props;
     CUDA_CHECK(cudaGetDeviceProperties(&props, device));
-    std::cout << "GPU: " << props.name << " (Compute " << props.major << "." << props.minor << ")" << std::endl;
+    // std::cout << "GPU: " << props.name << " (Compute " << props.major << "." << props.minor << ")" << std::endl;
 
     const size_t num_grid_cells = (size_t)ni * nj * nk;
     const size_t num_triangles = tri.size();
     const size_t num_vertices = x.size();
 
-    std::cout << "Grid: " << ni << "x" << nj << "x" << nk << " = " << num_grid_cells << " cells" << std::endl;
-    std::cout << "Mesh: " << num_vertices << " vertices, " << num_triangles << " triangles" << std::endl;
+    // std::cout << "Grid: " << ni << "x" << nj << "x" << nk << " = " << num_grid_cells << " cells" << std::endl;
+    // std::cout << "Mesh: " << num_vertices << " vertices, " << num_triangles << " triangles" << std::endl;
 
     // Allocate device memory
     Vec3ui* d_tri;
@@ -472,23 +472,24 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
     CUDA_CHECK(cudaMemcpy(debug_phi.data(), d_phi_read, num_grid_cells * sizeof(float), cudaMemcpyDeviceToHost));
     float min_near = *std::min_element(debug_phi.begin(), debug_phi.end());
     float max_near = *std::max_element(debug_phi.begin(), debug_phi.end());
-    float init_max = (ni+nj+nk)*dx;
-    int unchanged = 0, updated = 0;
-    for (float v : debug_phi) {
-        if (fabsf(v - init_max) < 1e-6f) unchanged++;
-        else updated++;
-    }
-    std::cout << "After near-band: min=" << min_near << ", max=" << max_near << std::endl;
-    std::cout << "  Cells: " << updated << " updated by near-band, " << unchanged << " still at init value" << std::endl;
+    // Debug output commented out for production use
+    // float init_max = (ni+nj+nk)*dx;
+    // int unchanged = 0, updated = 0;
+    // for (float v : debug_phi) {
+    //     if (fabsf(v - init_max) < 1e-6f) unchanged++;
+    //     else updated++;
+    // }
+    // std::cout << "After near-band: min=" << min_near << ", max=" << max_near << std::endl;
+    // std::cout << "  Cells: " << updated << " updated by near-band, " << unchanged << " still at init value" << std::endl;
 
     // Check a few specific sample values right after near-band
-    std::cout << "  Sample near-band values: ";
-    int sample_indices[] = {0, 100, 1000, (int)(num_grid_cells/2)};
-    for (int i = 0; i < 4; i++) {
-        int idx = sample_indices[i];
-        if (idx < num_grid_cells) std::cout << "[" << idx << "]=" << debug_phi[idx] << " ";
-    }
-    std::cout << std::endl;
+    // std::cout << "  Sample near-band values: ";
+    // int sample_indices[] = {0, 100, 1000, (int)(num_grid_cells/2)};
+    // for (int i = 0; i < 4; i++) {
+    //     int idx = sample_indices[i];
+    //     if (idx < num_grid_cells) std::cout << "[" << idx << "]=" << debug_phi[idx] << " ";
+    // }
+    // std::cout << std::endl;
 
     // Kernel 3: Fast sweeping
     dim3 blockSweep(8, 8, 8);
@@ -500,7 +501,7 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
     // to allow information to propagate across the entire gridf
     const int sweep_iterations = std::max(ni, std::max(nj, nk)) * 2;
 
-    std::cout << "Fast sweeping: " << sweep_iterations << " Jacobi iterations" << std::endl;
+    // std::cout << "Fast sweeping: " << sweep_iterations << " Jacobi iterations" << std::endl;
 
     for (int iter = 0; iter < sweep_iterations; ++iter) {
         fast_sweep_eikonal_kernel<<<gridSweep, blockSweep>>>(
@@ -508,44 +509,44 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
         CUDA_CHECK(cudaGetLastError());
         std::swap(d_phi_read, d_phi_write);
 
-        // DEBUG: Check convergence periodically
-        if (iter % (sweep_iterations / 4) == (sweep_iterations / 4 - 1) || iter == sweep_iterations - 1) {
-            CUDA_CHECK(cudaMemcpy(debug_phi.data(), d_phi_read, num_grid_cells * sizeof(float), cudaMemcpyDeviceToHost));
-            float min_val = *std::min_element(debug_phi.begin(), debug_phi.end());
-            float max_val = *std::max_element(debug_phi.begin(), debug_phi.end());
-            float avg_val = 0.0f;
-            for (float v : debug_phi) avg_val += v;
-            avg_val /= num_grid_cells;
-            std::cout << "  Iteration " << (iter+1) << ": min=" << min_val << ", max=" << max_val << ", avg=" << avg_val << std::endl;
-        }
+        // DEBUG: Check convergence periodically (commented out for production)
+        // if (iter % (sweep_iterations / 4) == (sweep_iterations / 4 - 1) || iter == sweep_iterations - 1) {
+        //     CUDA_CHECK(cudaMemcpy(debug_phi.data(), d_phi_read, num_grid_cells * sizeof(float), cudaMemcpyDeviceToHost));
+        //     float min_val = *std::min_element(debug_phi.begin(), debug_phi.end());
+        //     float max_val = *std::max_element(debug_phi.begin(), debug_phi.end());
+        //     float avg_val = 0.0f;
+        //     for (float v : debug_phi) avg_val += v;
+        //     avg_val /= num_grid_cells;
+        //     std::cout << "  Iteration " << (iter+1) << ": min=" << min_val << ", max=" << max_val << ", avg=" << avg_val << std::endl;
+        // }
     }
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    // DEBUG: Sample values at specific points for comparison
-    std::cout << "Sample distances before sign correction:" << std::endl;
-    int final_samples[] = {0, 100, 1000, 5000, 10000};
-    for (int s = 0; s < 5; s++) {
-        int sample_idx = final_samples[s];
-        if (sample_idx < num_grid_cells) {
-            int k = sample_idx / (ni * nj);
-            int j = (sample_idx - k * ni * nj) / ni;
-            int i = sample_idx - k * ni * nj - j * ni;
-            std::cout << "  [" << i << "," << j << "," << k << "]: " << debug_phi[sample_idx] << std::endl;
-        }
-    }
+    // DEBUG: Sample values at specific points for comparison (commented out for production)
+    // std::cout << "Sample distances before sign correction:" << std::endl;
+    // int final_samples[] = {0, 100, 1000, 5000, 10000};
+    // for (int s = 0; s < 5; s++) {
+    //     int sample_idx = final_samples[s];
+    //     if (sample_idx < num_grid_cells) {
+    //         int k = sample_idx / (ni * nj);
+    //         int j = (sample_idx - k * ni * nj) / ni;
+    //         int i = sample_idx - k * ni * nj - j * ni;
+    //         std::cout << "  [" << i << "," << j << "," << k << "]: " << debug_phi[sample_idx] << std::endl;
+    //     }
+    // }
 
-    // DEBUG: Check intersection counts before sign correction
-    std::vector<int> debug_intersections(num_grid_cells);
-    CUDA_CHECK(cudaMemcpy(debug_intersections.data(), d_intersection_count, num_grid_cells * sizeof(int), cudaMemcpyDeviceToHost));
-    int total_intersections = 0;
-    for (int v : debug_intersections) total_intersections += v;
-    std::cout << "Total intersections: " << total_intersections << std::endl;
-    std::cout << "Sample intersection counts at y=3,z=3: ";
-    for (int i = 0; i < 15 && i < ni; i++) {
-        int idx = grid_index(i, 3, 3, ni, nj);
-        std::cout << "[" << i << "]=" << debug_intersections[idx] << " ";
-    }
-    std::cout << std::endl;
+    // DEBUG: Check intersection counts before sign correction (commented out for production)
+    // std::vector<int> debug_intersections(num_grid_cells);
+    // CUDA_CHECK(cudaMemcpy(debug_intersections.data(), d_intersection_count, num_grid_cells * sizeof(int), cudaMemcpyDeviceToHost));
+    // int total_intersections = 0;
+    // for (int v : debug_intersections) total_intersections += v;
+    // std::cout << "Total intersections: " << total_intersections << std::endl;
+    // std::cout << "Sample intersection counts at y=3,z=3: ";
+    // for (int i = 0; i < 15 && i < ni; i++) {
+    //     int idx = grid_index(i, 3, 3, ni, nj);
+    //     std::cout << "[" << i << "]=" << debug_intersections[idx] << " ";
+    // }
+    // std::cout << std::endl;
 
     // Kernel 4: Sign correction
     dim3 blockSign(16, 16);
@@ -559,20 +560,20 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
     float* phi_data = &phi.a[0];
     CUDA_CHECK(cudaMemcpy(phi_data, d_phi_read, num_grid_cells * sizeof(float), cudaMemcpyDeviceToHost));
 
-    // DEBUG: Verify data was copied correctly
-    std::cout << "GPU->CPU copy verification:" << std::endl;
-    std::cout << "  Sample values after copy: ";
-    for (int s = 0; s < 5 && s < num_grid_cells; s++) {
-        std::cout << "[" << s << "]=" << phi_data[s] << " ";
-    }
-    std::cout << std::endl;
+    // DEBUG: Verify data was copied correctly (commented out for production)
+    // std::cout << "GPU->CPU copy verification:" << std::endl;
+    // std::cout << "  Sample values after copy: ";
+    // for (int s = 0; s < 5 && s < num_grid_cells; s++) {
+    //     std::cout << "[" << s << "]=" << phi_data[s] << " ";
+    // }
+    // std::cout << std::endl;
 
     // Verify using Array3f accessor
-    std::cout << "  Via Array3f accessor: ";
-    for (int i = 0; i < 5 && i < ni; i++) {
-        std::cout << "[" << i << ",0,0]=" << phi(i,0,0) << " ";
-    }
-    std::cout << std::endl;
+    // std::cout << "  Via Array3f accessor: ";
+    // for (int i = 0; i < 5 && i < ni; i++) {
+    //     std::cout << "[" << i << ",0,0]=" << phi(i,0,0) << " ";
+    // }
+    // std::cout << std::endl;
 
     // Cleanup
     CUDA_CHECK(cudaFree(d_tri));
@@ -584,7 +585,7 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
     CUDA_CHECK(cudaFree(d_closest_tri_read));
     CUDA_CHECK(cudaFree(d_closest_tri_write));
 
-    std::cout << "GPU SDF computation complete." << std::endl;
+    // std::cout << "GPU SDF computation complete." << std::endl;
 }
 
 } // namespace gpu

@@ -123,6 +123,33 @@ $RECYCLE.BIN/
 *.vti
 test_output/
 
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+pip-wheel-metadata/
+.Python
+.pytest_cache/
+.coverage
+.tox/
+.hypothesis/
+*.cover
+*.log
+
+# Python virtual environments
+venv/
+env/
+ENV/
+.venv
+
 # Dependency directories
 vcpkg_installed/
 

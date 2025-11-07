@@ -16,9 +16,6 @@
 
 namespace sdfgen {
 
-// Track which backend was actually used (for Auto mode reporting)
-static HardwareBackend last_used_backend = HardwareBackend::CPU;
-
 bool is_gpu_available() {
 #ifdef HAVE_CUDA
     // Check at runtime if a CUDA-capable GPU is actually present
@@ -28,10 +25,6 @@ bool is_gpu_available() {
 #else
     return false;
 #endif
-}
-
-HardwareBackend get_active_backend() {
-    return last_used_backend;
 }
 
 void make_level_set3(
@@ -57,13 +50,11 @@ void make_level_set3(
     // Dispatch to appropriate implementation
     switch (backend) {
         case HardwareBackend::CPU:
-            last_used_backend = HardwareBackend::CPU;
             cpu::make_level_set3(tri, x, origin, dx, nx, ny, nz, phi, exact_band, num_threads);
             break;
 
         case HardwareBackend::GPU:
 #ifdef HAVE_CUDA
-            last_used_backend = HardwareBackend::GPU;
             gpu::make_level_set3(tri, x, origin, dx, nx, ny, nz, phi, exact_band);
 #else
             throw std::runtime_error(

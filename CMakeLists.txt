@@ -3,28 +3,31 @@ cmake_minimum_required(VERSION 3.20)
 project(SDFGen VERSION 2.0 LANGUAGES CXX)
 
 # ============================================================================
+# Build Options
+# ============================================================================
+option(SDFGEN_BUILD_GPU "Build GPU-accelerated implementation" ON)
+option(BUILD_PYTHON_BINDINGS "Build Python bindings" OFF)
+
+# ============================================================================
 # Package Discovery - Auto-detect CUDA
 # ============================================================================
 
-# Try to find CUDA quietly first (for auto-detection)
-find_package(CUDAToolkit QUIET)
-if(CUDAToolkit_FOUND)
-    message(STATUS "SDFGen: CUDA Toolkit found - GPU support available")
-    # Enable CUDA language
-    enable_language(CUDA)
-    # Set default GPU build option to ON
-    option(SDFGEN_BUILD_GPU "Build GPU-accelerated implementation" ON)
+# Only try to find and enable CUDA if GPU build is requested
+if(SDFGEN_BUILD_GPU)
+    # Try to find CUDA quietly first (for auto-detection)
+    find_package(CUDAToolkit QUIET)
+    if(CUDAToolkit_FOUND)
+        message(STATUS "SDFGen: CUDA Toolkit found - GPU support available")
+        # Enable CUDA language
+        enable_language(CUDA)
+    else()
+        message(STATUS "SDFGen: CUDA Toolkit not found - forcing CPU-only build")
+        # Force GPU build option to OFF if CUDA not available
+        set(SDFGEN_BUILD_GPU OFF CACHE BOOL "Build GPU-accelerated implementation" FORCE)
+    endif()
 else()
-    message(STATUS "SDFGen: CUDA Toolkit not found - building CPU-only")
-    # Force GPU build option to OFF
-    set(SDFGEN_BUILD_GPU OFF CACHE BOOL "Build GPU-accelerated implementation" FORCE)
+    message(STATUS "SDFGen: GPU build disabled by user")
 endif()
-
-# ============================================================================
-# Build Options
-# ============================================================================
-# Note: SDFGEN_BUILD_GPU is set above based on CUDA availability
-# Users can still override with: cmake -DSDFGEN_BUILD_GPU=OFF
 
 # ============================================================================
 # Package Discovery - VTK (optional)
@@ -86,6 +89,11 @@ add_subdirectory(app)
 if(HAVE_CUDA AND SDFGEN_BUILD_GPU)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+# Conditionally build Python bindings
+if(BUILD_PYTHON_BINDINGS)
+    add_subdirectory(python)
 endif()
 
 # ============================================================================
