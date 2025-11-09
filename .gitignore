@@ -1,0 +1,157 @@
+# CMake build artifacts
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Build output directories
+bin/
+lib/
+out/
+
+# Generated configuration
+config.h
+
+# Object files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+
+# CUDA compilation artifacts
+*.fatbin
+*.cubin
+*.ptx
+*.i
+*.ii
+*.gpu
+*.cu.cpp
+
+# IDE-specific files
+
+## Visual Studio Code
+.vscode/
+*.code-workspace
+
+## Claude Code
+.claude/
+
+## CLion
+.idea/
+cmake-build-*/
+
+## Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.cachefile
+*.VC.VC.opendb
+
+## Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+
+## Eclipse
+.cproject
+.project
+.settings/
+
+## Qt Creator
+*.pro.user
+*.pro.user.*
+CMakeLists.txt.user*
+
+# OS-specific files
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+## Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Backup files
+*.bak
+*.swp
+*.swo
+*~
+*.orig
+
+# Test output files
+*.sdf
+*.vti
+test_output/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+pip-wheel-metadata/
+.Python
+.pytest_cache/
+.coverage
+.tox/
+.hypothesis/
+*.cover
+*.log
+
+# Python virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Dependency directories
+vcpkg_installed/
+
+# Logs
+*.log

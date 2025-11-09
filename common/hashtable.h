@@ -1,46 +1,75 @@
-#ifndef HASHTABLE_H
-#define HASHTABLE_H
+// SDFGen - Signed Distance Field Generator
+// Copyright (c) 2015 Christopher Batty, 2025 Brad Chamberlain
+// Licensed under the MIT License - see LICENSE file
+
+#pragma once
 
 #include <functional>
 #include <iostream>
 #include <vector>
 
+/**
+ * @brief Hash table entry storing key-value pair with chaining
+ * @tparam Key Key type
+ * @tparam Data Value type
+ */
 template<class Key, class Data>
 struct HashEntry
 {
-   Key key;
-   Data data;
-   int next;
+   Key key;   /**< Entry key */
+   Data data; /**< Entry value */
+   int next;  /**< Index of next entry in chain, or -1 */
 };
 
-// a useful core hash function
+/**
+ * @brief Core hash function for unsigned integers
+ * @param k Unsigned integer to hash
+ * @return Hash value using multiplicative hashing
+ */
 inline unsigned int hash(unsigned int k)
 { return k*2654435769u; }
 
-// default hash function object
+/**
+ * @brief Default hash function object for hash table
+ */
 struct DefaultHashFunction
 {
    template<typename Key>
    unsigned int operator() (const Key &k) const { return hash(k); }
 };
 
+/**
+ * @brief Default equality comparison functor
+ */
 struct equal
 {
    template<typename T>
    bool operator() (const T &a, const T &b) const { return a==b; }
 };
 
+/**
+ * @brief Hash table with separate chaining for collision resolution
+ *
+ * Implements a hash table using separate chaining via linked lists stored in a pool.
+ * Automatically resizes when load factor exceeds threshold. Used internally for spatial
+ * hashing during SDF computation.
+ *
+ * @tparam Key Key type
+ * @tparam Data Value type
+ * @tparam HashFunction Hash function object (default: DefaultHashFunction)
+ * @tparam KeyEqual Equality comparison functor (default: equal)
+ */
 template<typename Key, typename Data, class HashFunction=DefaultHashFunction, class KeyEqual=equal>
 struct HashTable
 {
-   unsigned int table_rank;
-   unsigned int table_bits;
-   std::vector<int> table;
-   unsigned int num_entries;
-   std::vector<HashEntry<Key, Data> > pool;
-   int free_list;
-   const HashFunction hash_function;
-   const KeyEqual key_equal;
+   unsigned int table_rank;   /**< Current table size as power of 2 */
+   unsigned int table_bits;   /**< Number of bits used for indexing */
+   std::vector<int> table;    /**< Hash table buckets (indices into pool) */
+   unsigned int num_entries;  /**< Current number of entries */
+   std::vector<HashEntry<Key, Data> > pool; /**< Entry storage pool */
+   int free_list;             /**< Head of free entry list */
+   const HashFunction hash_function; /**< Hash function object */
+   const KeyEqual key_equal;  /**< Equality comparison object */
 
    explicit HashTable(unsigned int expected_size=64)
       : hash_function(HashFunction()), key_equal(KeyEqual())
@@ -245,4 +274,3 @@ struct HashTable
    }
 };
 
-#endif

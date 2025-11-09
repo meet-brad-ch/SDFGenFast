@@ -1,16 +1,27 @@
-#ifndef HASHGRID_H
-#define HASHGRID_H
+// SDFGen - Signed Distance Field Generator
+// Copyright (c) 2015 Christopher Batty, 2025 Brad Chamberlain
+// Licensed under the MIT License - see LICENSE file
+
+#pragma once
 
 #include "hashtable.h"
 #include "vec.h"
 
 //========================================================= first do 2D ============================
 
+/**
+ * @brief 2D spatial hash grid for efficient spatial queries
+ *
+ * Uniform grid subdivision of 2D space using hash table for storage. Each cell can contain
+ * multiple data items. Useful for broad-phase collision detection and nearest neighbor queries.
+ *
+ * @tparam DataType Type of data stored in grid cells
+ */
 template<class DataType>
 struct HashGrid2
 {
-   double dx, overdx; // side-length of a grid cell and its reciprocal
-   HashTable<Vec2i,DataType> grid;
+   double dx, overdx; /**< Grid cell size and its reciprocal */
+   HashTable<Vec2i,DataType> grid; /**< Hash table mapping cell coordinates to data */
 
    explicit HashGrid2(double dx_=1, int expected_size=512)
       : dx(dx_), overdx(1/dx_), grid(expected_size)
@@ -71,11 +82,19 @@ struct HashGrid2
 
 //==================================== and now in 3D =================================================
 
+/**
+ * @brief 3D spatial hash grid for efficient spatial queries
+ *
+ * Uniform grid subdivision of 3D space using hash table for storage. Each cell can contain
+ * multiple data items. Used during SDF computation for fast triangle-to-grid-cell queries.
+ *
+ * @tparam DataType Type of data stored in grid cells (typically triangle indices)
+ */
 template<class DataType>
 struct HashGrid3
 {
-   double dx, overdx; // side-length of a grid cell and its reciprocal
-   HashTable<Vec3i,DataType> grid;
+   double dx, overdx; /**< Grid cell size and its reciprocal */
+   HashTable<Vec3i,DataType> grid; /**< Hash table mapping cell coordinates to data */
 
    explicit HashGrid3(double dx_=1, int expected_size=512)
       : dx(dx_), overdx(1/dx_), grid(expected_size)
@@ -134,4 +153,3 @@ struct HashGrid3
    }
 };
 
-#endif

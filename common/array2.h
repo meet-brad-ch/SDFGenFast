@@ -1,11 +1,24 @@
-#ifndef ARRAY2_H
-#define ARRAY2_H
+// SDFGen - Signed Distance Field Generator
+// Copyright (c) 2015 Christopher Batty, 2025 Brad Chamberlain
+// Licensed under the MIT License - see LICENSE file
+
+#pragma once
 
 #include "array1.h"
 #include <algorithm>
 #include <cassert>
 #include <vector>
 
+/**
+ * @brief 2D array container with row-major storage order
+ *
+ * Template class for storing 2D grid data in a contiguous 1D array using row-major
+ * (i fastest) indexing. Elements are accessed via operator(i,j) which maps to linear
+ * index i + ni*j. Provides STL-compatible interface. Similar to Array3 but for 2D data.
+ *
+ * @tparam T Element type
+ * @tparam ArrayT Underlying storage container (default: std::vector<T>)
+ */
 template<class T, class ArrayT=std::vector<T> >
 struct Array2
 {
@@ -25,8 +38,8 @@ struct Array2
 
    // the actual representation
 
-   int ni, nj;
-   ArrayT a;
+   int ni, nj; /**< Grid dimensions (i, j) */
+   ArrayT a;   /**< Underlying 1D storage array */
 
    // the interface
 
@@ -277,4 +290,3 @@ typedef Array2<unsigned short, WrapArray1<unsigned short> >         WrapArray2us
 typedef Array2<char, WrapArray1<char> >                             WrapArray2c;
 typedef Array2<unsigned char, WrapArray1<unsigned char> >           WrapArray2uc;
 
-#endif

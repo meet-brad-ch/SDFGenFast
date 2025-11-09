@@ -1,5 +1,8 @@
-#ifndef ARRAY1_H
-#define ARRAY1_H
+// SDFGen - Signed Distance Field Generator
+// Copyright (c) 2015 Christopher Batty, 2025 Brad Chamberlain
+// Licensed under the MIT License - see LICENSE file
+
+#pragma once
 
 #include <algorithm>
 #include <cstring>
@@ -10,19 +13,25 @@
 #include <stdexcept>
 #include <vector>
 
-// In this file:
-//   Array1<T>: a dynamic 1D array for plain-old-data (not objects)
-//   WrapArray1<T>: a 1D array wrapper around an existing array (perhaps objects, perhaps data)
-// For the most part std::vector operations are supported, though for the Wrap version
-// note that memory is never allocated/deleted and constructor/destructors are never called
-// from within the class, thus only shallow copies can be made and some operations such as
-// resize() and push_back() are limited.
-// Note: for the most part assertions are done with assert(), not exceptions...
+/**
+ * @file array1.h
+ * @brief 1D array containers for plain-old-data types
+ *
+ * Provides two 1D array types:
+ * - Array1<T>: Dynamic 1D array for plain-old-data (POD) types with automatic memory management
+ * - WrapArray1<T>: Non-owning wrapper around existing arrays, no allocation/deallocation
+ *
+ * Array1 supports most std::vector operations. WrapArray1 has limited operations (no resize,
+ * no push_back) since it doesn't own memory. Both use assertions for bounds checking rather
+ * than exceptions in most cases.
+ */
 
-// gross template hacking to determine if a type is integral or not
-struct Array1True {};
-struct Array1False {};
-template<typename T> struct Array1IsIntegral{ typedef Array1False type; }; // default: no (specializations to yes follow)
+// Template metaprogramming to determine if type is integral
+struct Array1True {};  /**< Tag type for integral types */
+struct Array1False {}; /**< Tag type for non-integral types */
+
+/** @brief Type trait to detect integral types */
+template<typename T> struct Array1IsIntegral{ typedef Array1False type; };
 template<> struct Array1IsIntegral<bool>{ typedef Array1True type; };
 template<> struct Array1IsIntegral<char>{ typedef Array1True type; };
 template<> struct Array1IsIntegral<signed char>{ typedef Array1True type; };
@@ -37,6 +46,15 @@ template<> struct Array1IsIntegral<long long>{ typedef Array1True type; };
 template<> struct Array1IsIntegral<unsigned long long>{ typedef Array1True type; };
 
 //============================================================================
+/**
+ * @brief Dynamic 1D array for plain-old-data types
+ *
+ * Efficient 1D array with manual memory management optimized for POD types.
+ * Provides std::vector-like interface but uses malloc/free instead of new/delete.
+ * Does not call constructors/destructors. Suitable for numeric types and simple structs.
+ *
+ * @tparam T Element type (should be POD)
+ */
 template<typename T>
 struct Array1
 {
@@ -467,6 +485,16 @@ typedef Array1<char>               Array1c;
 typedef Array1<unsigned char>      Array1uc;
 
 //============================================================================
+/**
+ * @brief Non-owning wrapper around existing 1D array
+ *
+ * Provides array-like interface without memory ownership. Does not allocate or deallocate
+ * memory, and does not call constructors/destructors. Useful for wrapping C-style arrays
+ * or memory-mapped data. Operations like resize() and push_back() are not available.
+ * Only shallow copies can be made.
+ *
+ * @tparam T Element type
+ */
 template<typename T>
 struct WrapArray1
 {
@@ -791,4 +819,3 @@ typedef WrapArray1<unsigned short>     WrapArray1us;
 typedef WrapArray1<char>               WrapArray1c;
 typedef WrapArray1<unsigned char>      WrapArray1uc;
 
-#endif

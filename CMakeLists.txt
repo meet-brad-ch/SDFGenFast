@@ -1,39 +1,120 @@
-cmake_minimum_required(VERSION 2.6)
-Project("SDFGen")
+cmake_minimum_required(VERSION 3.20)
 
-# Set the build type.  Options are:
-#  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
-#  Debug          : w/ debug symbols, w/o optimization
-#  Release        : w/o debug symbols, w/ optimization
-#  RelWithDebInfo : w/ debug symbols, w/ optimization
-#  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
+project(SDFGen VERSION 2.0 LANGUAGES CXX)
 
-# SET(CMAKE_BUILD_TYPE Coverage)
-SET(CMAKE_BUILD_TYPE Release)
+# ============================================================================
+# Build Options
+# ============================================================================
+option(SDFGEN_BUILD_GPU "Build GPU-accelerated implementation" ON)
+option(BUILD_PYTHON_BINDINGS "Build Python bindings" OFF)
 
-#set the default path for built executables to the "bin" directory
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/bin)
+# ============================================================================
+# Package Discovery - Auto-detect CUDA
+# ============================================================================
 
-#These flags might not work on every system, especially the release flags, comment out as needed
-set(CMAKE_CXX_FLAGS "-O3")
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
+# Only try to find and enable CUDA if GPU build is requested
+if(SDFGEN_BUILD_GPU)
+    # Try to find CUDA quietly first (for auto-detection)
+    find_package(CUDAToolkit QUIET)
+    if(CUDAToolkit_FOUND)
+        message(STATUS "SDFGen: CUDA Toolkit found - GPU support available")
+        # Enable CUDA language
+        enable_language(CUDA)
+    else()
+        message(STATUS "SDFGen: CUDA Toolkit not found - forcing CPU-only build")
+        # Force GPU build option to OFF if CUDA not available
+        set(SDFGEN_BUILD_GPU OFF CACHE BOOL "Build GPU-accelerated implementation" FORCE)
+    endif()
+else()
+    message(STATUS "SDFGen: GPU build disabled by user")
+endif()
 
-#checks if VTK is available
+# ============================================================================
+# Package Discovery - VTK (optional)
+# ============================================================================
+
+# VTK (optional, for .vti output format)
 find_package(VTK QUIET)
 if(VTK_FOUND)
-	set(HAVE_VTK 1)
+    set(HAVE_VTK 1)
+    message(STATUS "SDFGen: VTK found (${VTK_VERSION}) - .vti output enabled")
+else()
+    set(HAVE_VTK 0)
+    message(STATUS "SDFGen: Building without VTK - binary .sdf output only")
 endif()
 
-#Generates config.h replacing expressions in config.h.in with actual values
+# Set HAVE_CUDA based on final SDFGEN_BUILD_GPU value
+if(SDFGEN_BUILD_GPU)
+    set(HAVE_CUDA 1)
+    message(STATUS "SDFGen: GPU acceleration enabled")
+    message(STATUS "SDFGen: CUDA Compiler: ${CMAKE_CUDA_COMPILER}")
+else()
+    set(HAVE_CUDA 0)
+    message(STATUS "SDFGen: GPU build disabled")
+endif()
+
+# Generate config.h from config.h.in
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
-  "${CMAKE_CURRENT_SOURCE_DIR}/config.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/config.h"
 )
 
-add_executable(${PROJECT_NAME} main.cpp  makelevelset3.cpp)
+# Make generated config.h available to all subdirectories
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-if(VTK_FOUND)
-	include_directories(${VTK_INCLUDE_DIRS})
-	target_link_libraries(${PROJECT_NAME} ${VTK_LIBRARIES})
+# ============================================================================
+# Output Directories
+# ============================================================================
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/lib)
+
+# ============================================================================
+# Subdirectories
+# ============================================================================
+
+# Always build common and CPU libraries
+add_subdirectory(common)
+add_subdirectory(cpu_lib)
+
+# Conditionally build GPU library
+if(HAVE_CUDA AND SDFGEN_BUILD_GPU)
+    add_subdirectory(gpu_lib)
 endif()
+
+# Always build the main application
+add_subdirectory(app)
+
+# Always build tests
+enable_testing()
+add_subdirectory(tests)
+
+# Conditionally build Python bindings
+if(BUILD_PYTHON_BINDINGS)
+    add_subdirectory(python)
+endif()
+
+# ============================================================================
+# Installation
+# ============================================================================
+install(TARGETS SDFGen
+    RUNTIME DESTINATION bin
+)
+
+# ============================================================================
+# Build Summary
+# ============================================================================
+message(STATUS "")
+message(STATUS "========================================")
+message(STATUS "SDFGen Configuration Summary")
+message(STATUS "========================================")
+message(STATUS "  Version:        ${PROJECT_VERSION}")
+message(STATUS "  C++ Compiler:   ${CMAKE_CXX_COMPILER}")
+message(STATUS "  Build Type:     ${CMAKE_BUILD_TYPE}")
+message(STATUS "  VTK Support:    ${HAVE_VTK}")
+message(STATUS "  CUDA Support:   ${HAVE_CUDA}")
+if(HAVE_CUDA)
+message(STATUS "  CUDA Compiler:  ${CMAKE_CUDA_COMPILER}")
+endif()
+message(STATUS "========================================")
+message(STATUS "")

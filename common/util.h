@@ -1,9 +1,13 @@
-#ifndef UTIL_H
-#define UTIL_H
+// SDFGen - Signed Distance Field Generator
+// Copyright (c) 2015 Christopher Batty, 2025 Brad Chamberlain
+// Licensed under the MIT License - see LICENSE file
+
+#pragma once
 
 #include <algorithm>
 #include <vector>
 #include <cmath>
+#include <climits>
 #include <iostream>
 
 #ifndef M_PI
@@ -19,46 +23,150 @@ using std::min;
 using std::max;
 using std::swap;
 
+/** @name Basic Math Utilities
+ * Simple mathematical helper functions
+ * @{
+ */
+
+/**
+ * @brief Compute square of a value
+ * @tparam T Numeric type
+ * @param x Value to square
+ * @return x multiplied by itself (x*x)
+ */
 template<class T>
 inline T sqr(const T& x)
 { return x*x; }
 
+/**
+ * @brief Compute cube of a value
+ * @tparam T Numeric type
+ * @param x Value to cube
+ * @return x multiplied by itself twice (x*x*x)
+ */
 template<class T>
 inline T cube(const T& x)
 { return x*x*x; }
 
+/**
+ * @brief Find minimum of three values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @return Smallest of the three values
+ */
 template<class T>
 inline T min(T a1, T a2, T a3)
 { return min(a1, min(a2, a3)); }
 
+/**
+ * @brief Find minimum of four values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @return Smallest of the four values
+ */
 template<class T>
 inline T min(T a1, T a2, T a3, T a4)
 { return min(min(a1, a2), min(a3, a4)); }
 
+/**
+ * @brief Find minimum of five values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @param a5 Fifth value
+ * @return Smallest of the five values
+ */
 template<class T>
 inline T min(T a1, T a2, T a3, T a4, T a5)
 { return min(min(a1, a2), min(a3, a4), a5); }
 
+/**
+ * @brief Find minimum of six values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @param a5 Fifth value
+ * @param a6 Sixth value
+ * @return Smallest of the six values
+ */
 template<class T>
 inline T min(T a1, T a2, T a3, T a4, T a5, T a6)
 { return min(min(a1, a2), min(a3, a4), min(a5, a6)); }
 
+/**
+ * @brief Find maximum of three values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @return Largest of the three values
+ */
 template<class T>
 inline T max(T a1, T a2, T a3)
 { return max(a1, max(a2, a3)); }
 
+/**
+ * @brief Find maximum of four values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @return Largest of the four values
+ */
 template<class T>
 inline T max(T a1, T a2, T a3, T a4)
 { return max(max(a1, a2), max(a3, a4)); }
 
+/**
+ * @brief Find maximum of five values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @param a5 Fifth value
+ * @return Largest of the five values
+ */
 template<class T>
 inline T max(T a1, T a2, T a3, T a4, T a5)
 { return max(max(a1, a2), max(a3, a4),  a5); }
 
+/**
+ * @brief Find maximum of six values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @param a5 Fifth value
+ * @param a6 Sixth value
+ * @return Largest of the six values
+ */
 template<class T>
 inline T max(T a1, T a2, T a3, T a4, T a5, T a6)
 { return max(max(a1, a2), max(a3, a4),  max(a5, a6)); }
 
+/**
+ * @brief Find minimum and maximum of two values
+ *
+ * Efficiently determines both minimum and maximum of two values in a single comparison.
+ *
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param amin Output parameter set to minimum value
+ * @param amax Output parameter set to maximum value
+ */
 template<class T>
 inline void minmax(T a1, T a2, T& amin, T& amax)
 {
@@ -71,6 +179,18 @@ inline void minmax(T a1, T a2, T& amin, T& amax)
    }
 }
 
+/**
+ * @brief Find minimum and maximum of three values
+ *
+ * Efficiently determines both minimum and maximum of three values with minimal comparisons.
+ *
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param amin Output parameter set to minimum value
+ * @param amax Output parameter set to maximum value
+ */
 template<class T>
 inline void minmax(T a1, T a2, T a3, T& amin, T& amax)
 {
@@ -96,6 +216,16 @@ inline void minmax(T a1, T a2, T a3, T& amin, T& amax)
    }
 }
 
+/**
+ * @brief Find minimum and maximum of four values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @param amin Output parameter set to minimum value
+ * @param amax Output parameter set to maximum value
+ */
 template<class T>
 inline void minmax(T a1, T a2, T a3, T a4, T& amin, T& amax)
 {
@@ -118,22 +248,53 @@ inline void minmax(T a1, T a2, T a3, T a4, T& amin, T& amax)
    }
 }
 
+/**
+ * @brief Find minimum and maximum of five values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @param a5 Fifth value
+ * @param amin Output parameter set to minimum value
+ * @param amax Output parameter set to maximum value
+ */
 template<class T>
 inline void minmax(T a1, T a2, T a3, T a4, T a5, T& amin, T& amax)
 {
-   //@@@ the logic could be shortcircuited a lot!
    amin=min(a1,a2,a3,a4,a5);
    amax=max(a1,a2,a3,a4,a5);
 }
 
+/**
+ * @brief Find minimum and maximum of six values
+ * @tparam T Comparable type
+ * @param a1 First value
+ * @param a2 Second value
+ * @param a3 Third value
+ * @param a4 Fourth value
+ * @param a5 Fifth value
+ * @param a6 Sixth value
+ * @param amin Output parameter set to minimum value
+ * @param amax Output parameter set to maximum value
+ */
 template<class T>
 inline void minmax(T a1, T a2, T a3, T a4, T a5, T a6, T& amin, T& amax)
 {
-   //@@@ the logic could be shortcircuited a lot!
    amin=min(a1,a2,a3,a4,a5,a6);
    amax=max(a1,a2,a3,a4,a5,a6);
 }
 
+/**
+ * @brief Update min/max range to include new value
+ *
+ * Expands the range [amin, amax] to include value a1 if necessary.
+ *
+ * @tparam T Comparable type
+ * @param a1 Value to include in range
+ * @param amin Minimum of range (updated if a1 < amin)
+ * @param amax Maximum of range (updated if a1 > amax)
+ */
 template<class T>
 inline void update_minmax(T a1, T& amin, T& amax)
 {
@@ -166,6 +327,17 @@ inline void sort(T &a, T &b, T &c)
    }
 }
 
+/**
+ * @brief Clamp value to specified range
+ *
+ * Returns value constrained to [lower, upper] range.
+ *
+ * @tparam T Comparable type
+ * @param a Value to clamp
+ * @param lower Lower bound of range
+ * @param upper Upper bound of range
+ * @return a if lower <= a <= upper, lower if a < lower, upper if a > upper
+ */
 template<class T>
 inline T clamp(T a, T lower, T upper)
 {
@@ -174,7 +346,16 @@ inline T clamp(T a, T lower, T upper)
    else return a;
 }
 
-// only makes sense with T=float or double
+/**
+ * @brief Smooth interpolation function (smoothstep)
+ *
+ * Hermite interpolation with zero derivatives at boundaries. Maps [0,1] to [0,1]
+ * with smooth acceleration/deceleration. Uses polynomial 6r^5 - 15r^4 + 10r^3.
+ *
+ * @tparam T Floating-point type (float or double)
+ * @param r Input value (clamped to [0,1])
+ * @return Smoothly interpolated value in [0,1]
+ */
 template<class T>
 inline T smooth_step(T r)
 {
@@ -183,25 +364,46 @@ inline T smooth_step(T r)
    return r*r*r*(10+r*(-15+r*6));
 }
 
-// only makes sense with T=float or double
+/**
+ * @brief Smooth interpolation with custom input and output ranges
+ *
+ * Maps value r from range [r_lower, r_upper] to range [value_lower, value_upper]
+ * using smooth interpolation.
+ *
+ * @tparam T Floating-point type
+ * @param r Input value
+ * @param r_lower Lower bound of input range
+ * @param r_upper Upper bound of input range
+ * @param value_lower Lower bound of output range
+ * @param value_upper Upper bound of output range
+ * @return Smoothly interpolated value between value_lower and value_upper
+ */
 template<class T>
 inline T smooth_step(T r, T r_lower, T r_upper, T value_lower, T value_upper)
 { return value_lower + smooth_step((r-r_lower)/(r_upper-r_lower)) * (value_upper-value_lower); }
 
-// only makes sense with T=float or double
+/**
+ * @brief Ramp function with smooth transitions
+ *
+ * Maps [-1,1] to [-1,1] using smooth interpolation.
+ *
+ * @tparam T Floating-point type
+ * @param r Input value
+ * @return Smoothly ramped value
+ */
 template<class T>
 inline T ramp(T r)
 { return smooth_step((r+1)/2)*2-1; }
 
-#ifdef WIN32
-inline int lround(double x)
-{
-   if(x>0)
-      return (x-floor(x)<0.5) ? (int)floor(x) : (int)ceil(x);
-   else
-      return (x-floor(x)<=0.5) ? (int)floor(x) : (int)ceil(x);
-}
+/** @} */ // end of Basic Math Utilities group
 
+#ifdef WIN32
+/**
+ * @brief Compute floating-point remainder
+ * @param x Dividend
+ * @param y Divisor
+ * @return Remainder of x/y rounded to nearest integer
+ */
 inline double remainder(double x, double y)
 {
    return x-std::floor(x/y+0.5)*y;
@@ -467,4 +669,3 @@ void write_matlab(std::ostream& output, const std::vector<T>& a, const char *var
    output.precision(old_precision);
 }
 
-#endif
