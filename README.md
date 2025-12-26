@@ -28,7 +28,7 @@ cd tools
 
 # Windows
 cd tools
-configure_cmake.bat Release && build_with_vs.bat all
+configure.bat Release && build.bat all
 ```
 
 **Python bindings:**
@@ -168,7 +168,7 @@ float32 distance values in Z-major order
 **C++ Tests (14 tests):**
 ```bash
 # Build tests (if not already built)
-cd tools && ./build_with_vs.bat all  # or ./build.sh
+cd tools && ./build.bat all  # or ./build.sh
 
 # Run tests
 cd ../build-Release/bin

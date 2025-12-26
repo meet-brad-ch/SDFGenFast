@@ -8,24 +8,24 @@ REM Configures a CMake project using Visual Studio toolchain and Ninja generator
 REM Works with any CMake-based project - just place in a 'tools' subdirectory
 REM
 REM Usage:
-REM   configure_cmake.bat [build_type] [generator]
+REM   configure.bat [build_type] [generator]
 REM
 REM Arguments:
 REM   build_type - Debug or Release (default: Release)
 REM   generator  - "Ninja" or "Visual Studio" (default: Ninja)
 REM
 REM Example:
-REM   configure_cmake.bat Release
-REM   configure_cmake.bat Debug Ninja
-REM   configure_cmake.bat Release "Visual Studio"
+REM   configure.bat Release
+REM   configure.bat Debug Ninja
+REM   configure.bat Release "Visual Studio"
 REM ============================================================================
 
 REM Setup VS environment first
 call "%~dp0setup_vs_env.bat"
 if errorlevel 1 (
     echo.
-    echo [configure_cmake] ERROR: Cannot continue without Visual Studio
-    echo [configure_cmake] Configuration aborted.
+    echo [configure] ERROR: Cannot continue without Visual Studio
+    echo [configure] Configuration aborted.
     echo.
     exit /b 1
 )
@@ -42,20 +42,20 @@ set PROJECT_ROOT=%~dp0..
 set BUILD_DIR=%PROJECT_ROOT%\build-%BUILD_TYPE%
 
 echo.
-echo [configure_cmake] ============================================
-echo [configure_cmake] CMake Configuration
-echo [configure_cmake] ============================================
-echo [configure_cmake] Build Type:  %BUILD_TYPE%
-echo [configure_cmake] Generator:   %GENERATOR%
-echo [configure_cmake] Project:     %PROJECT_ROOT%
-echo [configure_cmake] Build Dir:   %BUILD_DIR%
-echo [configure_cmake] ============================================
+echo [configure] ============================================
+echo [configure] CMake Configuration
+echo [configure] ============================================
+echo [configure] Build Type:  %BUILD_TYPE%
+echo [configure] Generator:   %GENERATOR%
+echo [configure] Project:     %PROJECT_ROOT%
+echo [configure] Build Dir:   %BUILD_DIR%
+echo [configure] ============================================
 echo.
 
 REM Verify CMakeLists.txt exists
 if not exist "%PROJECT_ROOT%\CMakeLists.txt" (
-    echo [configure_cmake] ERROR: CMakeLists.txt not found in %PROJECT_ROOT%
-    echo [configure_cmake] Make sure this script is in a 'tools' subdirectory of your CMake project
+    echo [configure] ERROR: CMakeLists.txt not found in %PROJECT_ROOT%
+    echo [configure] Make sure this script is in a 'tools' subdirectory of your CMake project
     exit /b 1
 )
 
@@ -64,7 +64,7 @@ if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 cd /d "%BUILD_DIR%"
 
 REM Run CMake configuration
-echo [configure_cmake] Running CMake...
+echo [configure] Running CMake...
 echo.
 
 if /i "%GENERATOR%"=="Ninja" (
@@ -72,22 +72,22 @@ if /i "%GENERATOR%"=="Ninja" (
 ) else if /i "%GENERATOR%"=="Visual Studio" (
     cmake -G "%VS_GENERATOR%" -A x64 "%PROJECT_ROOT%"
 ) else (
-    echo [configure_cmake] ERROR: Unknown generator "%GENERATOR%"
-    echo [configure_cmake] Valid options: Ninja, "Visual Studio"
+    echo [configure] ERROR: Unknown generator "%GENERATOR%"
+    echo [configure] Valid options: Ninja, "Visual Studio"
     exit /b 1
 )
 
 if errorlevel 1 (
     echo.
-    echo [configure_cmake] ERROR: CMake configuration failed
+    echo [configure] ERROR: CMake configuration failed
     exit /b 1
 )
 
 echo.
-echo [configure_cmake] ============================================
-echo [configure_cmake] Configuration complete!
-echo [configure_cmake] Build directory: %BUILD_DIR%
-echo [configure_cmake] ============================================
+echo [configure] ============================================
+echo [configure] Configuration complete!
+echo [configure] Build directory: %BUILD_DIR%
+echo [configure] ============================================
 echo.
 
 exit /b 0
