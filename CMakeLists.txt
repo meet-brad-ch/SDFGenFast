@@ -3,6 +3,17 @@ cmake_minimum_required(VERSION 3.20)
 project(SDFGen VERSION 2.0 LANGUAGES CXX)
 
 # ============================================================================
+# Fetch CLI11 for command-line parsing
+# ============================================================================
+include(FetchContent)
+FetchContent_Declare(
+    cli11
+    GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+    GIT_TAG v2.4.2
+)
+FetchContent_MakeAvailable(cli11)
+
+# ============================================================================
 # Build Options
 # ============================================================================
 option(SDFGEN_BUILD_GPU "Build GPU-accelerated implementation" ON)
@@ -84,6 +95,9 @@ endif()
 
 # Always build the main application
 add_subdirectory(app)
+
+# Build utility tools
+add_subdirectory(sdf_to_mesh)
 
 # Always build tests
 enable_testing()
