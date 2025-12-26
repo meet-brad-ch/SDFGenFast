@@ -75,6 +75,22 @@ nvidia-smi         # Should show GPU info (Linux)
 
 ---
 
+## Cloning the Repository
+
+This project uses git submodules. Clone with:
+
+```bash
+git clone --recurse-submodules https://github.com/meet-brad-ch/SDFGenFast
+```
+
+If you already cloned without submodules:
+
+```bash
+git submodule update --init
+```
+
+---
+
 ## Quick Start
 
 ### Windows
@@ -83,10 +99,10 @@ nvidia-smi         # Should show GPU info (Linux)
 cd tools
 
 # Configure build
-./configure_cmake.bat Release
+./configure.bat Release
 
 # Build everything
-./build_with_vs.bat all Release
+./build.bat all Release
 
 # Executables created in build-Release/bin/
 ```
@@ -119,7 +135,7 @@ The configuration phase generates build files and detects CUDA.
 **Windows:**
 ```powershell
 cd tools
-./configure_cmake.bat Release
+./configure.bat Release
 ```
 
 **Linux:**
@@ -145,7 +161,7 @@ chmod +x configure.sh
 **Windows:**
 ```powershell
 cd tools
-./build_with_vs.bat all Release
+./build.bat all Release
 ```
 
 **Linux:**
@@ -157,8 +173,8 @@ cd tools
 **Optional: Build specific targets:**
 ```bash
 # Windows
-./build_with_vs.bat SDFGen Release      # CLI only
-./build_with_vs.bat test_correctness    # Specific test
+./build.bat SDFGen Release      # CLI only
+./build.bat test_correctness    # Specific test
 
 # Linux
 ./build.sh SDFGen                       # CLI only
@@ -215,7 +231,7 @@ This automatically:
 ```powershell
 # 1. Configure CMake (if not done already)
 cd tools
-./configure_cmake.bat Release
+./configure.bat Release
 
 # 2. Enable Python bindings
 cd ../build-Release
@@ -223,7 +239,7 @@ cmake -DBUILD_PYTHON_BINDINGS=ON -DPython_EXECUTABLE="C:/Python310/python.exe" .
 
 # 3. Build Python extension
 cd ../tools
-./build_with_vs.bat sdfgen_ext Release
+./build.bat sdfgen_ext Release
 ```
 
 **Linux:**
@@ -426,8 +442,8 @@ cmake -DSDFGEN_BUILD_GPU=OFF ..
 
 ```bash
 # Windows
-./configure_cmake.bat Debug
-./build_with_vs.bat all Debug
+./configure.bat Debug
+./build.bat all Debug
 
 # Linux
 ./configure.sh Debug
@@ -440,12 +456,12 @@ Creates `build-Debug/` with debug symbols and assertions enabled.
 
 ```bash
 # Option 1: Clean target
-./build_with_vs.bat clean  # Windows
+./build.bat clean  # Windows
 ./build.sh clean           # Linux
 
 # Option 2: Delete build directory
 rm -rf build-Release
-./configure_cmake.bat Release  # Reconfigure from scratch
+./configure.bat Release  # Reconfigure from scratch
 ```
 
 ---
@@ -469,8 +485,8 @@ SDFGenFast/
 │   ├── __init__.py
 │   └── sdfgen_ext.*.pyd/.so
 └── tools/                          # Build scripts
-    ├── configure_cmake.bat / configure.sh
-    └── build_with_vs.bat / build.sh
+    ├── configure.bat / configure.sh
+    └── build.bat / build.sh
 ```
 
 ---
