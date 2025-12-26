@@ -75,6 +75,22 @@ nvidia-smi         # Should show GPU info (Linux)
 
 ---
 
+## Cloning the Repository
+
+This project uses git submodules. Clone with:
+
+```bash
+git clone --recurse-submodules https://github.com/meet-brad-ch/SDFGenFast
+```
+
+If you already cloned without submodules:
+
+```bash
+git submodule update --init
+```
+
+---
+
 ## Quick Start
 
 ### Windows
