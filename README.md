@@ -8,12 +8,14 @@ A high-performance command-line utility and Python library for generating grid-b
 
 - **Automatic GPU Acceleration**: Detects and uses CUDA-capable GPUs automatically (no manual flags needed)
 - **Fast CPU Fallback**: Multi-threaded CPU implementation when GPU is unavailable
+- **Mesh Watertightness Check**: Automatic detection of holes and non-manifold edges
+- **Mesh Repair**: Optional hole-filling with `--fix` flag for non-watertight meshes
 - **Python Bindings**: High-performance nanobind-based API with NumPy integration and GPU support
 - **Multiple Input Formats**: Binary/ASCII STL and Wavefront OBJ (quads automatically triangulated)
 - **Flexible Grid Sizing**: Proportional or manual dimension specification
 - **Binary SDF Output**: Compact binary format with metadata header
 - **Cross-Platform**: Windows (MSVC) and Linux (GCC/Clang) with automated build scripts
-- **Comprehensive Testing**: 14 C++ tests + 51 Python tests validating all functionality
+- **Comprehensive Testing**: C++ tests + 51 Python tests validating all functionality
 
 ## Quick Start
 
@@ -64,6 +66,30 @@ SDFGen mesh.stl 128 256 64 1
 ```bash
 SDFGen mesh.obj 0.01 2 10    # Use 10 threads
 SDFGen mesh.stl 128 1 0      # Auto-detect thread count
+```
+
+**Optional flags:**
+```bash
+SDFGen --fix mesh.stl 128    # Repair non-watertight meshes (fill holes)
+SDFGen --cpu mesh.stl 128    # Force CPU backend (skip GPU)
+SDFGen --fix --cpu mesh.stl 128  # Both flags
+```
+
+**SDF to Mesh conversion** (for debugging/visualization):
+```bash
+sdf_to_mesh input.sdf output.obj           # Extract surface mesh
+sdf_to_mesh input.sdf output.obj -i 0.5    # Extract isosurface at distance 0.5
+```
+
+**Mesh watertightness** is always checked and reported:
+```
+Mesh Analysis:
+  Boundary edges:     3632 (holes detected)
+  Number of holes:    41
+  Is watertight:      NO
+
+  WARNING: Mesh is not watertight. SDF sign determination may be incorrect.
+           Use --fix flag to attempt automatic hole filling.
 ```
 
 ### Python Usage
@@ -165,7 +191,7 @@ float32 distance values in Z-major order
 
 ## Testing
 
-**C++ Tests (14 tests):**
+**C++ Tests (15 tests):**
 ```bash
 # Build tests (if not already built)
 cd tools && ./build.bat all  # or ./build.sh
@@ -197,7 +223,11 @@ pytest python/tests/test_sdfgen.py -v
 ```
 SDFGenFast/
 ├── app/              # CLI application
-├── common/           # Shared utilities (unified API, I/O)
+├── common/           # Shared utilities (unified API, I/O, mesh repair)
+│   ├── mesh_io.*     # OBJ/STL file loading
+│   ├── mesh_repair.* # Watertightness check and hole filling
+│   ├── sdf_io.*      # SDF file I/O
+│   └── sdfgen_unified.* # Unified CPU/GPU API
 ├── cpu_lib/          # Multi-threaded CPU implementation
 ├── gpu_lib/          # CUDA GPU implementation
 ├── python/           # Python bindings (nanobind + NumPy)
@@ -205,8 +235,9 @@ SDFGenFast/
 │   ├── __init__.py
 │   ├── tests/test_sdfgen.py    # 51 tests
 │   └── README.md               # Python API docs
-├── tests/            # C++ test suite (14 tests)
-├── tools/            # Build scripts
+├── tests/            # C++ test suite
+├── tools/            # Build scripts (external submodule)
+├── sdf_to_mesh/      # SDF to mesh converter (marching cubes)
 ├── BUILD.md          # Build instructions
 └── README.md         # This file
 ```
@@ -329,7 +360,7 @@ cd tests
 
 SDFGen includes comprehensive test coverage for both C++ and Python components.
 
-### C++ Test Suite (14 tests)
+### C++ Test Suite (15 tests)
 
 **Test Categories:**
 
@@ -351,7 +382,10 @@ SDFGen includes comprehensive test coverage for both C++ and Python components.
    - `test_obj_file_io` - OBJ file processing
    - `test_ascii_stl` - ASCII STL support
 
-4. **Edge Case Tests (2)**
+4. **Library Tests (1)**
+   - `test_mesh_repair` - Mesh watertightness analysis and repair API
+
+5. **Edge Case Tests (2)**
    - `test_thread_slice_ratios` - Threading edge cases
    - `test_vtk_output` - VTK format support (if compiled)
 
@@ -455,7 +489,7 @@ This enhanced version adds significant improvements over the [original SDFGen](h
 | **Platforms** | Linux/Mac | Windows + Linux with automated scripts |
 | **GPU Support** | None | Automatic detection and usage |
 | **Python API** | None | nanobind bindings with NumPy + GPU |
-| **Testing** | None | 14 C++ + 51 Python tests |
+| **Testing** | None | 15 C++ + 51 Python tests |
 | **Documentation** | Basic | Complete build guide + examples |
 | **Speed (256³)** | ~20 seconds | 1.29s GPU / 4.18s CPU (20 threads) |
 
@@ -470,6 +504,7 @@ This enhanced version adds significant improvements over the [original SDFGen](h
 
 - **Python Bindings**: High-performance nanobind API with NumPy integration and GPU support
 - **STL Support**: Binary and ASCII STL file formats (original only supported OBJ)
+- **Mesh Repair**: Automatic watertightness detection with optional hole-filling (`--fix`)
 - **Flexible Grid Modes**: Proportional dimension calculation for STL files
 - **Improved CLI**: Multiple usage modes with better parameter handling
 - **Thread Control**: Configurable CPU thread count for optimal performance
@@ -492,6 +527,6 @@ This enhanced version adds significant improvements over the [original SDFGen](h
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2025-01-06
+**Version:** 2.2.0
+**Last Updated:** 2025-12-26
 **Tested On:** Windows 11, Ubuntu 22.04, Python 3.10-3.12, CUDA 12.4

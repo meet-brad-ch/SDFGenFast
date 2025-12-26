@@ -6,6 +6,8 @@
 #include "sdfgen_unified.h"  // Unified API with CPU/GPU backend selection
 #include "sdf_io.h"          // Shared SDF file I/O functions
 #include "mesh_io.h"         // Mesh file loading (OBJ, STL)
+#include "mesh_repair.h"     // Mesh watertightness check and repair
+#include <CLI/CLI.hpp>
 #include <cmath>
 
 #ifdef HAVE_VTK
@@ -23,109 +25,92 @@
 #include <limits>
 #include <cstdint>
 #include <cstring>
+#include <vector>
+#include <algorithm>
 
 int main(int argc, char* argv[]) {
 
-  // Detect mode based on argument count and file extension
-  bool mode_precise = false;  // Mode 2: precise grid dimensions (STL with Nx, Ny, Nz)
-  bool is_stl = false;
+  CLI::App app{"SDFGen - Generate signed distance fields from triangle meshes"};
+
+  // Positional arguments
   std::string filename;
+  std::vector<float> dimensions;  // Can be: [dx, padding] for OBJ, or [Nx], [Nx,pad], [Nx,Ny,Nz], [Nx,Ny,Nz,pad] for STL
 
-  if(argc >= 2) {
-    filename = std::string(argv[1]);
-    if(filename.size() >= 4 && filename.substr(filename.size()-4) == std::string(".stl")) {
-      is_stl = true;
-      if(argc >= 3) {
-        mode_precise = true;  // STL with Nx [padding] OR Nx Ny Nz [padding]
-      }
-    }
-  }
+  app.add_option("input", filename, "Input mesh file (.obj or .stl)")
+      ->required()
+      ->check(CLI::ExistingFile);
+  app.add_option("dimensions", dimensions, "Grid dimensions:\n"
+      "  OBJ: <dx> <padding>           - cell size and padding\n"
+      "  STL: <Nx> [Ny Nz] [padding]   - grid size (proportional or manual)")
+      ->expected(1, 4);
 
-  // Print usage if arguments don't match any mode
-  if((!mode_precise && argc < 4) || (mode_precise && argc < 3)) {
-    std::cout << "SDFGen - A utility for converting closed oriented triangle meshes into grid-based signed distance fields.\n\n";
+  // Optional flags
+  bool force_cpu = false;
+  bool fix_mesh = false;
+  int num_threads = 0;
+  int padding = 1;
 
-    std::cout << "=== Mode 1: Legacy OBJ with dx spacing ===\n";
-    std::cout << "Usage: SDFGen <file.obj> <dx> <padding> [threads]\n\n";
-    std::cout << "Where:\n";
-    std::cout << "  <file.obj>  Wavefront OBJ file (text format, triangles only)\n";
-    std::cout << "  <dx>        Grid cell size (determines resolution automatically)\n";
-    std::cout << "  <padding>   Number of padding cells around mesh (minimum 1)\n";
-    std::cout << "  [threads]   Optional: Number of CPU threads (0=auto, default: 0)\n\n";
+  app.add_flag("--cpu", force_cpu, "Force CPU backend (skip GPU)");
+  app.add_flag("--fix", fix_mesh, "Repair non-watertight meshes (fill holes)");
+  app.add_option("-t,--threads", num_threads, "CPU thread count (0=auto)")
+      ->default_val(0);
+  app.add_option("-p,--padding", padding, "Padding cells around mesh")
+      ->default_val(1);
 
-    std::cout << "=== Mode 2a: STL with proportional dimensions (recommended) ===\n";
-    std::cout << "Usage: SDFGen <file.stl> <Nx> [padding] [threads]\n\n";
-    std::cout << "Where:\n";
-    std::cout << "  <file.stl>  Binary STL file\n";
-    std::cout << "  <Nx>        Grid size in X dimension (Ny, Nz calculated proportionally)\n";
-    std::cout << "  [padding]   Optional padding cells (default: 1)\n";
-    std::cout << "  [threads]   Optional: Number of CPU threads (0=auto, default: 0)\n\n";
+  // Show full help on error (e.g., missing required arguments)
+  app.failure_message(CLI::FailureMessage::help);
 
-    std::cout << "=== Mode 2b: STL with manual dimensions ===\n";
-    std::cout << "Usage: SDFGen <file.stl> <Nx> <Ny> <Nz> [padding] [threads]\n\n";
-    std::cout << "Where:\n";
-    std::cout << "  <file.stl>  Binary STL file\n";
-    std::cout << "  <Nx>        Exact grid size in X dimension\n";
-    std::cout << "  <Ny>        Exact grid size in Y dimension\n";
-    std::cout << "  <Nz>        Exact grid size in Z dimension\n";
-    std::cout << "  [padding]   Optional padding cells (default: 1)\n";
-    std::cout << "  [threads]   Optional: Number of CPU threads (0=auto, default: 0)\n\n";
+  CLI11_PARSE(app, argc, argv);
 
-    std::cout << "Output: Binary SDF file with 36-byte header + float32 grid data\n";
-    std::cout << "Header: 3 ints (Nx,Ny,Nz) + 6 floats (bounds_min, bounds_max)\n\n";
+  // Detect file type
+  std::string ext = filename.substr(filename.find_last_of(".") + 1);
+  std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+  bool is_stl = (ext == "stl");
+  bool mode_precise = is_stl;  // STL uses grid dimensions, OBJ uses dx
 
-    std::cout << "=== Hardware Acceleration ===\n";
-    std::cout << "GPU acceleration (CUDA) is used automatically if available.\n";
-    std::cout << "The program will detect and report which backend is being used.\n";
-    std::cout << "No special flags needed - it just works!\n\n";
-
-    exit(-1);
+  // Validate dimensions
+  if (dimensions.empty()) {
+    std::cerr << "Error: Grid dimensions required.\n";
+    std::cerr << "  OBJ: SDFGen mesh.obj <dx> <padding>\n";
+    std::cerr << "  STL: SDFGen mesh.stl <Nx> [Ny Nz] [padding]\n";
+    return 1;
   }
 
   // Common variables
   std::vector<Vec3f> vertList;
   std::vector<Vec3ui> faceList;
   Vec3f min_box, max_box;
-  int padding = 1;
   int target_nx = 0, target_ny = 0, target_nz = 0;
   float dx = 0.0f;
-  int num_threads = 0;  // 0 = auto-detect
 
   std::cout << "========================================\n";
   std::cout << "SDFGen - SDF Generation Tool\n";
   std::cout << "========================================\n\n";
 
   if(mode_precise) {
-    // === MODE 2: STL with precise dimensions ===
-    std::cout << "Mode: Precise grid dimensions (STL)\n";
+    // === MODE 2: STL with grid dimensions ===
+    std::cout << "Mode: Grid dimensions (STL)\n";
     std::cout << "Input: " << filename << "\n\n";
 
     // Load STL file first to get mesh dimensions
-    if(!meshio::load_stl(argv[1], vertList, faceList, min_box, max_box)) {
+    if(!meshio::load_stl(filename.c_str(), vertList, faceList, min_box, max_box)) {
       std::cerr << "Failed to load STL file.\n";
-      exit(-1);
+      return 1;
     }
 
     Vec3f mesh_size = max_box - min_box;
 
-    // Parse grid dimensions - support both 1-parameter and 3-parameter modes
-    // Handle argc=5 ambiguity: could be Mode 2a (Nx, padding, threads) or Mode 2b (Nx, Ny, Nz)
-    // Heuristic: if 2nd value < 20, treat as Mode 2a (padding is usually small)
-    bool is_mode2a = (argc == 3 || argc == 4 || (argc == 5 && atoi(argv[3]) < 20));
-
-    if(is_mode2a) {
-      // Single parameter mode: calculate Ny and Nz proportionally from Nx
-      target_nx = atoi(argv[2]);
-      if(argc >= 4) {
-        padding = atoi(argv[3]);
-      }
-      if(argc == 5) {
-        num_threads = atoi(argv[4]);
+    // Parse dimensions: [Nx] or [Nx, Ny, Nz]
+    if (dimensions.size() == 1 || dimensions.size() == 2) {
+      // Proportional mode: Nx only (optional padding in dimensions[1] for backwards compat)
+      target_nx = (int)dimensions[0];
+      if (dimensions.size() == 2 && dimensions[1] < 20) {
+        padding = (int)dimensions[1];  // Backwards compat: SDFGen mesh.stl 256 2
       }
 
       if(target_nx <= 0) {
         std::cerr << "Error: Grid dimension must be a positive integer.\n";
-        exit(-1);
+        return 1;
       }
       if(padding < 1) padding = 1;
 
@@ -136,97 +121,90 @@ int main(int argc, char* argv[]) {
       target_ny = (int)((mesh_size[1] / dx) + 0.5f) + 2 * padding;
       target_nz = (int)((mesh_size[2] / dx) + 0.5f) + 2 * padding;
 
-      std::cout << "Mode: Proportional dimensions (single parameter)\n";
+      std::cout << "Mode: Proportional dimensions\n";
       std::cout << "Input Nx: " << target_nx << "\n";
       std::cout << "Calculated grid: " << target_nx << " x " << target_ny << " x " << target_nz << "\n";
-      std::cout << "Padding: " << padding << " cells\n";
-      if(argc == 5) {
-        std::cout << "CPU threads: " << (num_threads == 0 ? "auto-detect" : std::to_string(num_threads)) << "\n";
-      }
-      std::cout << "\n";
 
-      std::cout << "Grid spacing calculation:\n";
-      std::cout << "  Mesh size: " << mesh_size[0] << " x " << mesh_size[1] << " x " << mesh_size[2] << " m\n";
-      std::cout << "  dx = " << dx << " m (based on X dimension)\n";
-      std::cout << "  Aspect ratios preserved: Y=" << (mesh_size[1]/mesh_size[0]) << ", Z=" << (mesh_size[2]/mesh_size[0]) << "\n\n";
-
-    } else {
-      // Three parameter mode: manual specification
-      target_nx = atoi(argv[2]);
-      target_ny = atoi(argv[3]);
-      target_nz = atoi(argv[4]);
-      if(argc >= 6) {
-        padding = atoi(argv[5]);
-      }
-      if(argc == 7) {
-        num_threads = atoi(argv[6]);
-      }
+    } else if (dimensions.size() >= 3) {
+      // Manual mode: Nx, Ny, Nz
+      target_nx = (int)dimensions[0];
+      target_ny = (int)dimensions[1];
+      target_nz = (int)dimensions[2];
 
       if(target_nx <= 0 || target_ny <= 0 || target_nz <= 0) {
         std::cerr << "Error: Grid dimensions must be positive integers.\n";
-        exit(-1);
+        return 1;
       }
       if(padding < 1) padding = 1;
-
-      std::cout << "Mode: Manual dimensions (three parameters)\n";
-      std::cout << "Target grid: " << target_nx << " x " << target_ny << " x " << target_nz << "\n";
-      std::cout << "Padding: " << padding << " cells\n";
-      if(argc == 7) {
-        std::cout << "CPU threads: " << (num_threads == 0 ? "auto-detect" : std::to_string(num_threads)) << "\n";
-      }
-      std::cout << "\n";
 
       // Calculate dx to fit the mesh into target grid
       float dx_x = mesh_size[0] / (target_nx - 2 * padding);
       float dx_y = mesh_size[1] / (target_ny - 2 * padding);
       float dx_z = mesh_size[2] / (target_nz - 2 * padding);
-
-      // Use the maximum dx to ensure all dimensions fit
       dx = std::max(dx_x, std::max(dx_y, dx_z));
 
-      std::cout << "Grid spacing calculation:\n";
-      std::cout << "  Mesh size: " << mesh_size[0] << " x " << mesh_size[1] << " x " << mesh_size[2] << " m\n";
-      std::cout << "  dx_x = " << dx_x << ", dx_y = " << dx_y << ", dx_z = " << dx_z << "\n";
-      std::cout << "  Using dx = " << dx << " m (maximum to fit all dimensions)\n\n";
+      std::cout << "Mode: Manual dimensions\n";
+      std::cout << "Target grid: " << target_nx << " x " << target_ny << " x " << target_nz << "\n";
     }
+
+    std::cout << "Padding: " << padding << " cells\n";
+    std::cout << "Threads: " << (num_threads == 0 ? "auto" : std::to_string(num_threads)) << "\n\n";
+    std::cout << "Mesh size: " << mesh_size[0] << " x " << mesh_size[1] << " x " << mesh_size[2] << " m\n";
+    std::cout << "Cell size (dx): " << dx << " m\n\n";
 
   } else {
-    // === MODE 1: OBJ with dx spacing (legacy) ===
-    std::cout << "Mode: Legacy dx spacing (OBJ)\n";
+    // === MODE 1: OBJ with dx spacing ===
+    std::cout << "Mode: Cell size spacing (OBJ)\n";
     std::cout << "Input: " << filename << "\n\n";
 
-    if(filename.size() < 5 || filename.substr(filename.size()-4) != std::string(".obj")) {
-      std::cerr << "Error: Mode 1 requires OBJ file (.obj extension).\n";
-      exit(-1);
+    // OBJ requires: dx [padding]
+    if (dimensions.empty()) {
+      std::cerr << "Error: OBJ mode requires cell size (dx).\n";
+      std::cerr << "Usage: SDFGen mesh.obj <dx> [-p padding]\n";
+      return 1;
     }
 
-    // Parse dx and padding
-    std::stringstream arg2(argv[2]);
-    arg2 >> dx;
-
-    std::stringstream arg3(argv[3]);
-    arg3 >> padding;
-
+    dx = dimensions[0];
+    if (dimensions.size() >= 2) {
+      padding = (int)dimensions[1];  // Backwards compat
+    }
     if(padding < 1) padding = 1;
 
-    // Parse optional threads parameter
-    if(argc >= 5) {
-      std::stringstream arg4(argv[4]);
-      arg4 >> num_threads;
-    }
-
-    std::cout << "Grid spacing (dx): " << dx << "\n";
+    std::cout << "Cell size (dx): " << dx << "\n";
     std::cout << "Padding: " << padding << " cells\n";
-    if(argc >= 5) {
-      std::cout << "CPU threads: " << (num_threads == 0 ? "auto-detect" : std::to_string(num_threads)) << "\n";
-    }
-    std::cout << "\n";
+    std::cout << "Threads: " << (num_threads == 0 ? "auto" : std::to_string(num_threads)) << "\n\n";
 
     // Load OBJ file
-    if(!meshio::load_obj(argv[1], vertList, faceList, min_box, max_box)) {
-      std::cerr << "Failed to load OBJ file. Terminating.\n";
-      exit(-1);
+    if(!meshio::load_obj(filename.c_str(), vertList, faceList, min_box, max_box)) {
+      std::cerr << "Failed to load OBJ file.\n";
+      return 1;
     }
+  }
+
+  // Weld duplicate vertices (STL files have separate vertices per triangle)
+  int welded = meshio::weld_vertices(vertList, faceList, 1e-5f);
+  if (welded > 0) {
+    std::cout << "Welded " << welded << " duplicate vertices\n";
+    std::cout << "Mesh now has " << vertList.size() << " vertices, " << faceList.size() << " triangles\n";
+  }
+
+  // Analyze mesh watertightness (always)
+  meshio::MeshAnalysis mesh_analysis = meshio::analyze_mesh(vertList, faceList);
+  meshio::print_mesh_analysis(mesh_analysis, false);
+
+  // Optionally repair mesh if --fix flag was provided
+  if (fix_mesh && !mesh_analysis.is_watertight) {
+    std::cout << "\nAttempting mesh repair (--fix)...\n";
+    int holes_filled = meshio::repair_mesh(vertList, faceList, 0.0f);  // No re-welding needed
+    if (holes_filled > 0) {
+      // Recalculate bounding box after repair
+      min_box = Vec3f(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+      max_box = Vec3f(-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max());
+      for (const auto& v : vertList) {
+        meshio::update_minmax(v, min_box, max_box);
+      }
+    }
+    std::cout << "\n";
   }
 
   // Add padding around the box and compute final grid dimensions
@@ -258,11 +236,14 @@ int main(int argc, char* argv[]) {
 
   // Runtime dispatch between CPU and GPU implementations using unified API
   Array3f phi_grid;
-  sdfgen::HardwareBackend backend = sdfgen::HardwareBackend::Auto;
+  sdfgen::HardwareBackend backend = force_cpu ? sdfgen::HardwareBackend::CPU : sdfgen::HardwareBackend::Auto;
 
   // Report which backend will be/was used
   std::cout << "  Hardware: ";
-  if(sdfgen::is_gpu_available()) {
+  if(force_cpu) {
+    std::cout << "CPU mode forced (--cpu flag)\n";
+    std::cout << "  Implementation: CPU (multi-threaded)\n\n";
+  } else if(sdfgen::is_gpu_available()) {
     std::cout << "GPU acceleration available\n";
     std::cout << "  Implementation: GPU (CUDA)\n\n";
   } else {

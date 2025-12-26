@@ -7,6 +7,7 @@ add_library(sdfgen_common STATIC
     mesh_io.cpp
     mesh_io_obj.cpp
     mesh_io_stl.cpp
+    mesh_repair.cpp
 )
 
 # Headers (vec.h, array3.h, etc.) are header-only

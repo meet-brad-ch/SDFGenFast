@@ -432,6 +432,33 @@ set_tests_properties(vtk_output_test PROPERTIES
 )
 
 # ============================================================================
+# Library Test: Mesh Repair API
+# ============================================================================
+add_executable(test_mesh_repair
+    test_mesh_repair.cpp
+)
+
+target_link_libraries(test_mesh_repair PRIVATE
+    sdfgen_common
+)
+
+set_target_properties(test_mesh_repair PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
+
+add_test(NAME mesh_repair_test
+    COMMAND test_mesh_repair
+    WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+)
+
+set_tests_properties(mesh_repair_test PROPERTIES
+    TIMEOUT 60
+    LABELS "library;mesh;repair"
+)
+
+# ============================================================================
 # Performance Benchmark (not a test - generates performance data)
 # ============================================================================
 add_executable(benchmark_performance

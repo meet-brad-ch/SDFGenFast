@@ -9,6 +9,7 @@ add_executable(SDFGen
 target_link_libraries(SDFGen PRIVATE
     sdfgen_cpu
     sdfgen_common
+    CLI11::CLI11
 )
 
 # Conditionally link against GPU library
