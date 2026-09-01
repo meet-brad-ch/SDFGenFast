@@ -18,45 +18,53 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 /**
- * @brief Convert NumPy array of float32 vertices to C++ vector
+ * @brief Convert an (N, 3) NumPy array to a vector of 3-component vectors
  *
- * Converts Nx3 NumPy array (contiguous, float32) to std::vector<Vec3f> for passing
- * vertex data from Python to C++ SDF generation functions.
+ * Shared implementation for float32 vertices (Vec3f) and uint32 triangle
+ * indices (Vec3ui).
  *
- * @param arr NumPy ndarray with shape (N, 3) and dtype float32, C-contiguous
- * @return std::vector containing N Vec3f vertex positions
+ * @tparam VecT Destination vector type (Vec3f or Vec3ui)
+ * @tparam ScalarT Source NumPy scalar type (float or uint32_t)
+ * @param arr NumPy ndarray with shape (N, 3), C-contiguous
+ * @return std::vector containing N VecT values
  */
-std::vector<Vec3f> numpy_to_vec3f(nb::ndarray<float, nb::shape<-1, 3>, nb::c_contig> arr) {
+template <typename VecT, typename ScalarT>
+static std::vector<VecT> numpy_to_vec3(
+    const nb::ndarray<ScalarT, nb::shape<-1, 3>, nb::c_contig>& arr) {
     size_t n = arr.shape(0);
-    std::vector<Vec3f> result(n);
+    std::vector<VecT> result(n);
 
     auto data = arr.data();
     for (size_t i = 0; i < n; ++i) {
-        result[i] = Vec3f(data[i * 3 + 0], data[i * 3 + 1], data[i * 3 + 2]);
+        result[i] = VecT(data[i * 3 + 0], data[i * 3 + 1], data[i * 3 + 2]);
     }
 
     return result;
 }
 
 /**
- * @brief Convert NumPy array of uint32 triangle indices to C++ vector
+ * @brief Convert a vector of 3-component vectors to an (N, 3) NumPy array
  *
- * Converts Mx3 NumPy array (contiguous, uint32) to std::vector<Vec3ui> for passing
- * triangle index data from Python to C++ SDF generation functions.
- *
- * @param arr NumPy ndarray with shape (M, 3) and dtype uint32, C-contiguous
- * @return std::vector containing M Vec3ui triangle index triples
+ * Shared implementation for the vertex and triangle arrays returned by
+ * load_mesh. The copy is owned by a capsule and freed by Python.
  */
-std::vector<Vec3ui> numpy_to_vec3ui(nb::ndarray<uint32_t, nb::shape<-1, 3>, nb::c_contig> arr) {
-    size_t n = arr.shape(0);
-    std::vector<Vec3ui> result(n);
-
-    auto data = arr.data();
+template <typename ScalarT, typename VecT>
+static nb::ndarray<nb::numpy, ScalarT, nb::shape<-1, 3>> vec3_to_numpy(
+    const std::vector<VecT>& items) {
+    size_t n = items.size();
+    ScalarT* data = new ScalarT[n * 3];
     for (size_t i = 0; i < n; ++i) {
-        result[i] = Vec3ui(data[i * 3 + 0], data[i * 3 + 1], data[i * 3 + 2]);
+        data[i * 3 + 0] = items[i][0];
+        data[i * 3 + 1] = items[i][1];
+        data[i * 3 + 2] = items[i][2];
     }
 
-    return result;
+    nb::capsule owner(data, [](void* p) noexcept {
+        delete[] static_cast<ScalarT*>(p);
+    });
+
+    size_t shape[2] = {n, 3};
+    return nb::ndarray<nb::numpy, ScalarT, nb::shape<-1, 3>>(data, 2, shape, owner);
 }
 
 /**
@@ -108,42 +116,8 @@ nb::tuple load_mesh(const std::string& filename) {
     }
 
     // Convert to numpy arrays
-    size_t nv = vertices.size();
-    size_t nt = triangles.size();
-
-    // Vertices array (nv, 3)
-    float* vert_data = new float[nv * 3];
-    for (size_t i = 0; i < nv; ++i) {
-        vert_data[i * 3 + 0] = vertices[i][0];
-        vert_data[i * 3 + 1] = vertices[i][1];
-        vert_data[i * 3 + 2] = vertices[i][2];
-    }
-
-    nb::capsule vert_owner(vert_data, [](void* p) noexcept {
-        delete[] static_cast<float*>(p);
-    });
-
-    size_t vert_shape[2] = {nv, 3};
-    auto vert_array = nb::ndarray<nb::numpy, float, nb::shape<-1, 3>>(
-        vert_data, 2, vert_shape, vert_owner
-    );
-
-    // Triangles array (nt, 3)
-    uint32_t* tri_data = new uint32_t[nt * 3];
-    for (size_t i = 0; i < nt; ++i) {
-        tri_data[i * 3 + 0] = triangles[i][0];
-        tri_data[i * 3 + 1] = triangles[i][1];
-        tri_data[i * 3 + 2] = triangles[i][2];
-    }
-
-    nb::capsule tri_owner(tri_data, [](void* p) noexcept {
-        delete[] static_cast<uint32_t*>(p);
-    });
-
-    size_t tri_shape[2] = {nt, 3};
-    auto tri_array = nb::ndarray<nb::numpy, uint32_t, nb::shape<-1, 3>>(
-        tri_data, 2, tri_shape, tri_owner
-    );
+    auto vert_array = vec3_to_numpy<float>(vertices);
+    auto tri_array = vec3_to_numpy<uint32_t>(triangles);
 
     // Bounding box as tuple
     auto bounds = nb::make_tuple(
@@ -180,8 +154,8 @@ nb::ndarray<nb::numpy, float> generate_sdf(
     }
 
     // Convert inputs
-    auto verts = numpy_to_vec3f(vertices);
-    auto tris = numpy_to_vec3ui(triangles);
+    auto verts = numpy_to_vec3<Vec3f>(vertices);
+    auto tris = numpy_to_vec3<Vec3ui>(triangles);
 
     Vec3f origin_vec(
         nb::cast<float>(origin[0]),
@@ -199,17 +173,21 @@ nb::ndarray<nb::numpy, float> generate_sdf(
         throw std::invalid_argument("Invalid backend: " + backend + " (must be 'auto', 'cpu', or 'gpu')");
     }
 
-    // Generate SDF
+    // Generate SDF. The computation can run for seconds on large grids
+    // and touches no Python state, so release the GIL for its duration.
     Array3f phi;
-    sdfgen::make_level_set3(
-        tris, verts,
-        origin_vec, dx,
-        nx, ny, nz,
-        phi,
-        exact_band,
-        hw_backend,
-        num_threads
-    );
+    {
+        nb::gil_scoped_release release;
+        sdfgen::make_level_set3(
+            tris, verts,
+            origin_vec, dx,
+            nx, ny, nz,
+            phi,
+            exact_band,
+            hw_backend,
+            num_threads
+        );
+    }
 
     // Convert to numpy
     return array3f_to_numpy(phi);

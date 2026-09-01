@@ -22,6 +22,12 @@ namespace test_utils {
 constexpr float BBOX_TOLERANCE = 1e-5f;
 /// Maximum acceptable difference threshold measured in cell widths
 constexpr float MAX_DIFF_THRESHOLD = 25.0f;
+
+// Cells whose CPU distance is within this many cell widths of the surface
+// belong to the near band, where both backends compute exact triangle
+// distances and must agree tightly. Beyond it the GPU's Jacobi Eikonal
+// solver legitimately diverges from the CPU's sweeping method.
+constexpr float NEAR_BAND_CELLS = 2.0f;
 /// Maximum number of mismatch details to print during comparison
 constexpr int32_t MAX_MISMATCH_PRINT = 5;
 
@@ -36,7 +42,9 @@ struct SDFComparisonResult {
     bool bbox_match = false;              ///< Bounding boxes match within BBOX_TOLERANCE
     int32_t total_cells = 0;              ///< Total number of grid cells compared
     int32_t mismatch_count = 0;           ///< Number of cells exceeding tolerance
+    int32_t sign_mismatch_count = 0;      ///< Cells where CPU and GPU disagree on inside/outside
     float max_diff = 0.0f;                ///< Maximum absolute difference found
+    float near_band_max_diff = 0.0f;      ///< Maximum difference within the near band
     float tolerance = 0.0f;               ///< Cell spacing (dx) used as base tolerance
 
     double cpu_time_ms = 0.0;             ///< CPU execution time in milliseconds
@@ -47,10 +55,18 @@ struct SDFComparisonResult {
     /**
      * @brief Check if comparison passed all validation criteria
      *
-     * @return true if dimensions match, bbox matches, and max difference is within acceptable bounds
+     * Pass requires: identical dimensions, matching bounding boxes, no
+     * inside/outside disagreements away from the surface, tight agreement
+     * in the near band (both backends compute exact distances there), and
+     * a bounded far-field deviation (the backends use different Eikonal
+     * propagation methods, so the far field is only loosely comparable).
+     *
+     * @return true if every criterion above holds
      */
     bool passed() const {
         return dimensions_match && bbox_match &&
+               sign_mismatch_count == 0 &&
+               near_band_max_diff <= tolerance &&
                (max_diff / tolerance) < (MAX_DIFF_THRESHOLD * 2.0f);
     }
 };

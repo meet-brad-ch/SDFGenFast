@@ -39,7 +39,8 @@ void make_level_set3(
     int num_threads)
 {
     // Handle Auto mode: try GPU first (if available at runtime), fall back to CPU
-    if (backend == HardwareBackend::Auto) {
+    bool auto_selected = (backend == HardwareBackend::Auto);
+    if (auto_selected) {
         if (is_gpu_available()) {
             backend = HardwareBackend::GPU;
         } else {
@@ -55,7 +56,20 @@ void make_level_set3(
 
         case HardwareBackend::GPU:
 #ifdef HAVE_CUDA
-            gpu::make_level_set3(tri, x, origin, dx, nx, ny, nz, phi, exact_band);
+            try {
+                gpu::make_level_set3(tri, x, origin, dx, nx, ny, nz, phi, exact_band);
+            } catch (const std::runtime_error& e) {
+                // A CUDA failure on an auto-selected GPU falls back to the
+                // CPU implementation. An explicitly requested GPU backend
+                // propagates the error to the caller.
+                if (!auto_selected) {
+                    throw;
+                }
+                std::cerr << "Warning: GPU backend failed (" << e.what()
+                          << "); falling back to CPU." << std::endl;
+                cpu::make_level_set3(tri, x, origin, dx, nx, ny, nz, phi,
+                                     exact_band, num_threads);
+            }
 #else
             throw std::runtime_error(
                 "GPU backend requested but CUDA support is not available. "

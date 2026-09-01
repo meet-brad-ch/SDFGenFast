@@ -44,10 +44,92 @@ import numpy as np
 from typing import Tuple, Optional
 
 
+def _grid_parameters(min_box, max_box, nx, ny, nz, dx, padding):
+    """Compute (origin, dx, nx, ny, nz) for a padded grid around the bounds.
+
+    Matches the SDFGen CLI semantics: grid dimensions given by the caller
+    are TOTAL sizes including padding cells. The cell size is derived so
+    the mesh plus padding fits the requested dimensions exactly.
+    """
+    extents = max_box - min_box
+
+    if dx is not None:
+        # Cell-size mode (CLI OBJ mode): dimensions grow to fit the mesh
+        # plus padding at the given cell size.
+        if nx is None:
+            nx = int(np.ceil(extents[0] / dx)) + 2 * padding
+        if ny is None:
+            ny = int(np.ceil(extents[1] / dx)) + 2 * padding
+        if nz is None:
+            nz = int(np.ceil(extents[2] / dx)) + 2 * padding
+    elif nx is not None:
+        if nx <= 2 * padding:
+            raise ValueError(
+                f"nx={nx} must exceed 2*padding={2 * padding}; "
+                "nx is the total grid size including padding cells"
+            )
+        if ny is None or nz is None:
+            # Proportional mode (CLI STL mode with Nx only)
+            dx = extents[0] / (nx - 2 * padding)
+            if ny is None:
+                ny = int(np.ceil(extents[1] / dx)) + 2 * padding
+            if nz is None:
+                nz = int(np.ceil(extents[2] / dx)) + 2 * padding
+        else:
+            # Manual mode (CLI STL mode with Nx Ny Nz): the largest
+            # per-axis cell size wins so the mesh always fits.
+            if min(ny, nz) <= 2 * padding:
+                raise ValueError(
+                    "ny and nz must exceed 2*padding; grid dimensions are "
+                    "total sizes including padding cells"
+                )
+            dx = max(
+                extents[0] / (nx - 2 * padding),
+                extents[1] / (ny - 2 * padding),
+                extents[2] / (nz - 2 * padding),
+            )
+    else:
+        raise ValueError(
+            "Must specify either 'dx' or 'nx' (or 'nx', 'ny', 'nz') for grid sizing"
+        )
+
+    origin = min_box - padding * dx
+    return tuple(origin), float(dx), int(nx), int(ny), int(nz)
+
+
+def _generate(vertices, triangles, min_box, max_box, nx, ny, nz, dx,
+              padding, exact_band, backend, num_threads):
+    """Shared implementation behind generate_from_mesh / generate_from_file."""
+    origin, dx, nx, ny, nz = _grid_parameters(
+        min_box, max_box, nx, ny, nz, dx, padding
+    )
+
+    sdf = generate_sdf(
+        vertices,
+        triangles,
+        origin,
+        dx,
+        nx,
+        ny,
+        nz,
+        exact_band=exact_band,
+        backend=backend,
+        num_threads=num_threads,
+    )
+
+    metadata = {
+        "origin": origin,
+        "dx": dx,
+        "bounds": (tuple(min_box), tuple(max_box)),
+        "backend": backend,
+    }
+    return sdf, metadata
+
+
 def generate_from_mesh(
     vertices: np.ndarray,
     triangles: np.ndarray,
-    nx: int,
+    nx: Optional[int] = None,
     ny: Optional[int] = None,
     nz: Optional[int] = None,
     dx: Optional[float] = None,
@@ -59,8 +141,13 @@ def generate_from_mesh(
     """
     Generate SDF from mesh arrays with automatic grid sizing.
 
-    This is a convenience function that automatically computes grid parameters
-    based on mesh bounds and desired resolution.
+    Grid dimensions are TOTAL sizes including padding cells, matching the
+    SDFGen command line: ``generate_from_mesh(v, t, nx=128)`` and
+    ``SDFGen mesh.stl 128`` produce the same grid.
+
+    .. versionchanged:: 2.2
+        ``nx``/``ny``/``nz`` now include the padding cells (CLI-consistent).
+        Previously padding was added on top of the requested dimensions.
 
     Parameters
     ----------
@@ -68,16 +155,17 @@ def generate_from_mesh(
         Vertex positions
     triangles : ndarray, shape (M, 3), dtype uint32
         Triangle indices
-    nx : int
-        Grid size in X dimension (or all dimensions if ny, nz not specified)
+    nx : int, optional
+        Total grid size in X, including padding (or all dimensions if
+        ny, nz are not given). Alternative to dx.
     ny : int, optional
-        Grid size in Y dimension (computed proportionally if not specified)
+        Total grid size in Y (computed proportionally if not specified)
     nz : int, optional
-        Grid size in Z dimension (computed proportionally if not specified)
+        Total grid size in Z (computed proportionally if not specified)
     dx : float, optional
-        Grid cell spacing (computed from nx and bounds if not specified)
+        Grid cell spacing (alternative to nx; dimensions grow to fit)
     padding : int, default=1
-        Number of padding cells around mesh
+        Number of padding cells around the mesh on each side
     exact_band : int, default=1
         Distance band for exact computation
     backend : str, default="auto"
@@ -92,54 +180,10 @@ def generate_from_mesh(
     metadata : dict
         Dictionary with keys: origin, dx, bounds, backend
     """
-    # Compute bounding box
     min_box = vertices.min(axis=0)
     max_box = vertices.max(axis=0)
-    extents = max_box - min_box
-
-    # Compute grid parameters
-    if ny is None or nz is None:
-        # Proportional sizing
-        if dx is None:
-            dx = extents[0] / nx
-        ny = int(np.ceil(extents[1] / dx)) if ny is None else ny
-        nz = int(np.ceil(extents[2] / dx)) if nz is None else nz
-    else:
-        # Manual sizing
-        if dx is None:
-            dx = max(extents[0] / nx, extents[1] / ny, extents[2] / nz)
-
-    # Add padding
-    nx += 2 * padding
-    ny += 2 * padding
-    nz += 2 * padding
-
-    # Adjust origin for padding
-    origin = min_box - padding * dx
-
-    # Generate SDF
-    sdf = generate_sdf(
-        vertices,
-        triangles,
-        tuple(origin),
-        dx,
-        nx,
-        ny,
-        nz,
-        exact_band=exact_band,
-        backend=backend,
-        num_threads=num_threads,
-    )
-
-    # Prepare metadata
-    metadata = {
-        "origin": tuple(origin),
-        "dx": dx,
-        "bounds": (tuple(min_box), tuple(max_box)),
-        "backend": backend,
-    }
-
-    return sdf, metadata
+    return _generate(vertices, triangles, min_box, max_box,
+                     nx, ny, nz, dx, padding, exact_band, backend, num_threads)
 
 
 def generate_from_file(
@@ -156,25 +200,27 @@ def generate_from_file(
     """
     Generate SDF directly from a mesh file.
 
-    This is a high-level convenience function that combines mesh loading
-    and SDF generation into a single call.
+    Grid dimensions are TOTAL sizes including padding cells, matching the
+    SDFGen command line (see generate_from_mesh).
+
+    .. versionchanged:: 2.2
+        ``nx``/``ny``/``nz`` now include the padding cells (CLI-consistent).
 
     Parameters
     ----------
     filename : str
         Path to mesh file (.obj or .stl)
     nx : int, optional
-        Grid size in X dimension. If only nx is provided, grid is sized
-        proportionally. If nx, ny, nz are all provided, grid uses exact
-        dimensions. If dx is provided instead, nx is computed from bounds.
+        Total grid size in X, including padding. If only nx is given the
+        grid is sized proportionally. Alternative to dx.
     ny : int, optional
-        Grid size in Y dimension
+        Total grid size in Y
     nz : int, optional
-        Grid size in Z dimension
+        Total grid size in Z
     dx : float, optional
         Grid cell spacing (alternative to nx/ny/nz)
     padding : int, default=1
-        Number of padding cells around mesh
+        Number of padding cells around the mesh on each side
     exact_band : int, default=1
         Distance band for exact computation
     backend : str, default="auto"
@@ -191,78 +237,20 @@ def generate_from_file(
 
     Examples
     --------
-    >>> # Proportional sizing (256^3 for a cube)
+    >>> # Proportional sizing, same grid as: SDFGen mesh.stl 256
     >>> sdf, meta = sdfgen.generate_from_file("mesh.stl", nx=256)
     >>>
     >>> # Exact dimensions
     >>> sdf, meta = sdfgen.generate_from_file("mesh.stl", nx=128, ny=128, nz=256)
     >>>
-    >>> # Using cell size (like CLI)
+    >>> # Using cell size, same grid as: SDFGen mesh.obj 0.01 2
     >>> sdf, meta = sdfgen.generate_from_file("mesh.obj", dx=0.01, padding=2)
     """
-    # Load mesh
     vertices, triangles, bounds = load_mesh(filename)
     min_box = np.array(bounds[0], dtype=np.float32)
     max_box = np.array(bounds[1], dtype=np.float32)
-    extents = max_box - min_box
-
-    # Determine grid sizing mode
-    if dx is not None:
-        # Mode 1: Use cell size (like CLI for OBJ)
-        if nx is None:
-            nx = int(np.ceil(extents[0] / dx))
-        if ny is None:
-            ny = int(np.ceil(extents[1] / dx))
-        if nz is None:
-            nz = int(np.ceil(extents[2] / dx))
-    elif nx is not None:
-        # Mode 2: Use grid dimensions
-        if ny is None or nz is None:
-            # Proportional sizing
-            if dx is None:
-                dx = extents[0] / nx
-            ny = int(np.ceil(extents[1] / dx)) if ny is None else ny
-            nz = int(np.ceil(extents[2] / dx)) if nz is None else nz
-        else:
-            # Manual sizing - compute dx from largest dimension
-            if dx is None:
-                dx = max(extents[0] / nx, extents[1] / ny, extents[2] / nz)
-    else:
-        raise ValueError(
-            "Must specify either 'dx' or 'nx' (or 'nx', 'ny', 'nz') for grid sizing"
-        )
-
-    # Add padding
-    nx += 2 * padding
-    ny += 2 * padding
-    nz += 2 * padding
-
-    # Adjust origin for padding
-    origin = min_box - padding * dx
-
-    # Generate SDF
-    sdf = generate_sdf(
-        vertices,
-        triangles,
-        tuple(origin),
-        dx,
-        nx,
-        ny,
-        nz,
-        exact_band=exact_band,
-        backend=backend,
-        num_threads=num_threads,
-    )
-
-    # Prepare metadata
-    metadata = {
-        "origin": tuple(origin),
-        "dx": dx,
-        "bounds": (tuple(min_box), tuple(max_box)),
-        "backend": backend,
-    }
-
-    return sdf, metadata
+    return _generate(vertices, triangles, min_box, max_box,
+                     nx, ny, nz, dx, padding, exact_band, backend, num_threads)
 
 
 # Export public API

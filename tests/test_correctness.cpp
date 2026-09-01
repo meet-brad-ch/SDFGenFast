@@ -11,6 +11,7 @@
  */
 
 #include "sdfgen_unified.h"  // Unified API with CPU/GPU backend selection
+#include "test_utils.h"
 #include <iostream>
 #include <chrono>
 #include <cmath>
@@ -140,69 +141,52 @@ int main(int argc, char* argv[]) {
     // ===== Validation =====
     std::cout << "Validating results...\n";
 
-    if(phi_cpu.ni != phi_gpu.ni || phi_cpu.nj != phi_gpu.nj || phi_cpu.nk != phi_gpu.nk) {
-        std::cerr << "ERROR: Grid dimensions mismatch!\n";
-        std::cerr << "  CPU: " << phi_cpu.ni << " x " << phi_cpu.nj << " x " << phi_cpu.nk << "\n";
-        std::cerr << "  GPU: " << phi_gpu.ni << " x " << phi_gpu.nj << " x " << phi_gpu.nk << "\n";
-        return 1;
-    }
-
-    int total_cells = phi_cpu.ni * phi_cpu.nj * phi_cpu.nk;
-    int mismatch_count = 0;
-    float max_diff = 0.0f;
-
-    for(int k = 0; k < phi_cpu.nk; ++k) {
-        for(int j = 0; j < phi_cpu.nj; ++j) {
-            for(int i = 0; i < phi_cpu.ni; ++i) {
-                float cpu_val = phi_cpu(i, j, k);
-                float gpu_val = phi_gpu(i, j, k);
-                float diff = std::abs(cpu_val - gpu_val);
-
-                if(diff > max_diff) {
-                    max_diff = diff;
-                }
-
-                if(diff > tolerance) {
-                    if(mismatch_count < 10) {  // Print first 10 mismatches
-                        std::cerr << "  Mismatch at (" << i << "," << j << "," << k << "): "
-                                  << "CPU=" << cpu_val << ", GPU=" << gpu_val
-                                  << ", diff=" << diff << "\n";
-                    }
-                    mismatch_count++;
-                }
-            }
-        }
-    }
+    test_utils::SDFComparisonResult cmp = test_utils::compare_sdf_grids(
+        phi_cpu, phi_gpu, origin, origin, origin, dx, /*verbose=*/true);
+    cmp.cpu_time_ms = cpu_time_ms;
+    cmp.gpu_time_ms = gpu_time_ms;
 
     // ===== Analysis Summary =====
     std::cout << "\n========================================\n";
-    std::cout << "Test Analysis\n";
-    std::cout << "========================================\n";
-    std::cout << "Total cells:        " << total_cells << "\n";
-    std::cout << "Mismatches (> " << tolerance << "):  " << mismatch_count << " (" << (100.0 * mismatch_count / total_cells) << "%)\n";
-    std::cout << "Max difference:     " << max_diff << "\n";
+    std::cout << "Total cells:        " << cmp.total_cells << "\n";
+    std::cout << "Mismatches (> " << cmp.tolerance << "):  " << cmp.mismatch_count
+              << " (" << (100.0 * cmp.mismatch_count / cmp.total_cells) << "%)\n";
+    std::cout << "Sign mismatches:    " << cmp.sign_mismatch_count << "\n";
+    std::cout << "Max difference:     " << cmp.max_diff << "\n";
+    std::cout << "Near-band max diff: " << cmp.near_band_max_diff << "\n";
     std::cout << "Cell size (dx):     " << dx << "\n";
-    std::cout << "Max diff / dx:      " << (max_diff / dx) << " (error in cell widths)\n";
+    std::cout << "Max diff / dx:      " << (cmp.max_diff / dx) << " (error in cell widths)\n";
     std::cout << "CPU time:           " << cpu_time_ms << " ms\n";
     std::cout << "GPU time:           " << gpu_time_ms << " ms\n";
-    std::cout << "Speedup:            " << (cpu_time_ms / gpu_time_ms) << "x\n";
+    if (gpu_time_ms > 0.0) {
+        std::cout << "Speedup:            " << (cpu_time_ms / gpu_time_ms) << "x\n";
+    }
     std::cout << "========================================\n";
 
-    // The test PASSES if the core correctness is met (no sign errors) and the
-    // performance gain is significant. The max difference is expected due to
-    // the use of a different, superior numerical method (Jacobi Eikonal vs. Gauss-Seidel).
-    // We check that the max difference is not pathologically large.
-    const float max_diff_in_dx_threshold = 25.0f; // Allow for up to 25 cell widths of deviation in the far field.
-
-    if (max_diff / dx < max_diff_in_dx_threshold) {
-        std::cout << "\n✓ ANALYSIS PASSED: The GPU implementation is correct and significantly faster.\n";
+    // Pass criteria (see SDFComparisonResult::passed): identical grids, no
+    // inside/outside disagreements, tight near-band agreement, and bounded
+    // far-field deviation. The far field is only loosely comparable because
+    // the CPU (sweeping) and GPU (Jacobi Eikonal) use different propagation
+    // methods.
+    if (cmp.passed()) {
+        std::cout << "\n[PASS] ANALYSIS PASSED: The GPU implementation matches the CPU reference.\n";
         std::cout << "  - Sign determination is correct.\n";
-        std::cout << "  - Eikonal solver has converged stably.\n";
-        std::cout << "  - Far-field distance differences are within expected bounds for the different numerical method.\n";
+        std::cout << "  - Near-band distances agree within tolerance.\n";
+        std::cout << "  - Far-field deviation is within expected bounds for the different numerical method.\n";
         return 0; // Success
-    } else {
-        std::cout << "\n✗ ANALYSIS FAILED: Maximum difference between CPU and GPU results is unacceptably large.\n";
-        std::cout << "  Max diff / dx = " << (max_diff / dx) << ", which exceeds threshold of " << max_diff_in_dx_threshold << "\n";
-        return 1; // Failure
     }
+
+    std::cout << "\n[FAIL] ANALYSIS FAILED:\n";
+    if (cmp.sign_mismatch_count != 0) {
+        std::cout << "  Sign mismatches: " << cmp.sign_mismatch_count << " (must be 0)\n";
+    }
+    if (cmp.near_band_max_diff > cmp.tolerance) {
+        std::cout << "  Near-band max diff " << cmp.near_band_max_diff
+                  << " exceeds tolerance " << cmp.tolerance << "\n";
+    }
+    if ((cmp.max_diff / cmp.tolerance) >= (test_utils::MAX_DIFF_THRESHOLD * 2.0f)) {
+        std::cout << "  Max diff / dx = " << (cmp.max_diff / dx)
+                  << " exceeds threshold " << test_utils::MAX_DIFF_THRESHOLD << "\n";
+    }
+    return 1; // Failure
 }

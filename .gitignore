@@ -118,7 +118,7 @@ $RECYCLE.BIN/
 
 # Test output files
 *.vti
-!tests/resources/*.sdf
+!tests/resources/test_x3y4z5_bin_sdf_32x32x32.sdf
 test_output/
 
 # Python artifacts

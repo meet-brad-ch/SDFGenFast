@@ -242,6 +242,15 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
 
          int slices_per_thread = std::max(1, k_range / (int)effective_threads);
 
+         // check_neighbour() writes only the current cell but reads slice
+         // k-dk. If a thread processed the first slice of its slab it would
+         // read the previous slab's last slice while the owning thread may
+         // still be writing it - a data race. Every thread except the first
+         // therefore skips its first slice; the skipped slices are swept
+         // serially after the join, when their k-dk neighbours are final.
+         // Results are deterministic for a fixed thread count.
+         std::vector<int> boundary_slices;
+
          for(unsigned int t=0; t<effective_threads; ++t){
             int thread_k_start, thread_k_end;
             if(dk>0){
@@ -250,6 +259,11 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
             } else {
                thread_k_start = k0 - t * slices_per_thread;
                thread_k_end = (t == effective_threads-1) ? k1 : (k0 - (t+1) * slices_per_thread);
+            }
+
+            if(t > 0){
+               boundary_slices.push_back(thread_k_start);
+               thread_k_start += dk;  // defer the slab's first slice
             }
 
             if((dk>0 && thread_k_start < thread_k_end) || (dk<0 && thread_k_start > thread_k_end)){
@@ -262,6 +276,12 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
          // Wait for all threads to complete
          for(auto& thread : thread_pool){
             thread.join();
+         }
+
+         // Serially sweep the deferred slab-boundary slices in sweep order.
+         for(int k_slice : boundary_slices){
+            sweep_range(tri, x, phi, closest_tri, origin, dx, di, dj, dk,
+                        k_slice, k_slice + dk);
          }
       }
    }

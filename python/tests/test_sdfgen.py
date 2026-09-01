@@ -639,8 +639,8 @@ class TestHighLevelAPIParameters:
             temp_obj_file, nx=20, ny=30, nz=40, padding=1
         )
 
-        # With padding=1, should be 20+2, 30+2, 40+2
-        assert sdf.shape == (22, 32, 42)
+        # v2.2: dimensions are total sizes including padding (CLI-consistent)
+        assert sdf.shape == (20, 30, 40)
         assert "dx" in metadata
 
     def test_generate_from_file_different_paddings(self, temp_obj_file):
@@ -649,8 +649,8 @@ class TestHighLevelAPIParameters:
             sdf, metadata = sdfgen.generate_from_file(
                 temp_obj_file, nx=20, padding=padding
             )
-            # Check that padding was applied
-            assert sdf.shape[0] >= 20 + 2 * padding
+            # v2.2: nx is the total size; padding lives inside it
+            assert sdf.shape[0] == 20
 
     def test_generate_from_file_backends(self, temp_obj_file):
         """Test generate_from_file with different backends."""
@@ -692,9 +692,9 @@ class TestHighLevelAPIParameters:
             vertices, triangles, nx=20, padding=2
         )
 
-        # nx should be 20 + 2*padding = 24
-        # ny, nz should be computed proportionally
-        assert sdf.shape[0] == 24
+        # v2.2: nx is the total size including padding
+        # ny, nz are computed proportionally
+        assert sdf.shape[0] == 20
         assert "dx" in metadata
         assert metadata["dx"] > 0
 
@@ -706,8 +706,8 @@ class TestHighLevelAPIParameters:
             vertices, triangles, nx=15, ny=20, nz=25, padding=1
         )
 
-        # Should be nx+2, ny+2, nz+2 with padding=1
-        assert sdf.shape == (17, 22, 27)
+        # v2.2: dimensions are total sizes including padding (CLI-consistent)
+        assert sdf.shape == (15, 20, 25)
 
     def test_generate_from_mesh_different_paddings(self, simple_cube):
         """Test generate_from_mesh with different padding values."""
@@ -717,8 +717,8 @@ class TestHighLevelAPIParameters:
             sdf, metadata = sdfgen.generate_from_mesh(
                 vertices, triangles, nx=16, padding=padding
             )
-            expected_size = 16 + 2 * padding
-            assert sdf.shape[0] == expected_size
+            # v2.2: nx is the total size; padding lives inside it
+            assert sdf.shape[0] == 16
 
     def test_generate_from_mesh_backends(self, simple_cube):
         """Test generate_from_mesh with different backends."""

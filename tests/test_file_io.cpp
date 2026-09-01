@@ -95,7 +95,7 @@ bool test_configuration(
     return true;
 }
 
-int main(int argc, char* argv[]) {
+int main() {
     std::cout << "========================================\n";
     std::cout << "SDFGen File I/O Test (Parameter Variations)\n";
     std::cout << "========================================\n\n";
