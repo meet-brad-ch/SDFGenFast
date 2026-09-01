@@ -1,28 +1,22 @@
-cmake_minimum_required(VERSION 3.20)
-
 # CPU implementation library
 add_library(sdfgen_cpu STATIC
     makelevelset3.cpp
 )
 
-# Include common headers (vec.h, array3.h) - no linking to avoid circular dependency
-target_include_directories(sdfgen_cpu PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/../common
-)
+target_include_directories(sdfgen_cpu PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Threading support (used in fast sweeping)
+# Threading support (used in fast sweeping). sdfgen_headers provides the
+# common headers (vec.h, array3.h) without linking sdfgen_common, which
+# would be circular.
 find_package(Threads REQUIRED)
-target_link_libraries(sdfgen_cpu PUBLIC Threads::Threads)
-
-# Set C++ standard
-set_target_properties(sdfgen_cpu PROPERTIES
-    CXX_STANDARD 11
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-    POSITION_INDEPENDENT_CODE ON
+target_link_libraries(sdfgen_cpu
+    PUBLIC
+        Threads::Threads
+        sdfgen_headers
+    PRIVATE
+        sdfgen_options
 )
 
-# Make headers available
-target_include_directories(sdfgen_cpu PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
+set_target_properties(sdfgen_cpu PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
 )

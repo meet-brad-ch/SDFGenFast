@@ -8,11 +8,11 @@
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/tuple.h>
 
-#include "../common/sdfgen_unified.h"
-#include "../common/mesh_io.h"
-#include "../common/sdf_io.h"
-#include "../common/array3.h"
-#include "../common/vec.h"
+#include "sdfgen_unified.h"
+#include "mesh_io.h"
+#include "sdf_io.h"
+#include "array3.h"
+#include "vec.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;

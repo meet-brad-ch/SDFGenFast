@@ -56,6 +56,7 @@ wheel.install-dir = "sdfgen"
 
 [tool.scikit-build.cmake.define]
 BUILD_PYTHON_BINDINGS = "ON"
+BUILD_TESTING = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]

@@ -1,6 +1,16 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.23)
 
 project(SDFGen VERSION 2.2.0 LANGUAGES CXX)
+
+# Default to a Release build for single-configuration generators.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Release Debug RelWithDebInfo MinSizeRel)
+endif()
+
+# One C++ standard for every target (carried by sdfgen_options below).
+# Mixing standards across statically linked targets is an ODR/ABI hazard.
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ============================================================================
 # Fetch CLI11 for command-line parsing
@@ -18,6 +28,32 @@ FetchContent_MakeAvailable(cli11)
 # ============================================================================
 option(SDFGEN_BUILD_GPU "Build GPU-accelerated implementation" ON)
 option(BUILD_PYTHON_BINDINGS "Build Python bindings" OFF)
+option(BUILD_TESTING "Build the test suite" ON)
+option(SDFGEN_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+set(SDFGEN_CUDA_ARCHITECTURES "all-major" CACHE STRING
+    "CUDA architectures to compile for (semicolon list, or all-major/native)")
+
+# ============================================================================
+# Project options target
+# ============================================================================
+# Every first-party target links sdfgen_options. It carries the C++ standard,
+# strict warning flags, and the include path of the generated config.h.
+# CUDA device code is unaffected: the flags are gated on COMPILE_LANGUAGE:CXX.
+add_library(sdfgen_options INTERFACE)
+target_compile_features(sdfgen_options INTERFACE cxx_std_17)
+if(MSVC)
+    target_compile_options(sdfgen_options INTERFACE
+        $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /utf-8>)
+    if(SDFGEN_WARNINGS_AS_ERRORS)
+        target_compile_options(sdfgen_options INTERFACE $<$<COMPILE_LANGUAGE:CXX>:/WX>)
+    endif()
+else()
+    target_compile_options(sdfgen_options INTERFACE
+        $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>)
+    if(SDFGEN_WARNINGS_AS_ERRORS)
+        target_compile_options(sdfgen_options INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-Werror>)
+    endif()
+endif()
 
 # ============================================================================
 # Package Discovery - Auto-detect CUDA
@@ -29,6 +65,17 @@ if(SDFGEN_BUILD_GPU)
     find_package(CUDAToolkit QUIET)
     if(CUDAToolkit_FOUND)
         message(STATUS "SDFGen: CUDA Toolkit found - GPU support available")
+        # nvcc rejects host compilers newer than it knows (e.g. CUDA 12.x
+        # with Visual Studio 2026 / MSVC 19.50+). Pass the override so the
+        # build proceeds; parity tests still validate the result.
+        if(MSVC AND MSVC_VERSION GREATER 1949 AND CUDAToolkit_VERSION VERSION_LESS 13.0)
+            message(WARNING "SDFGen: MSVC ${MSVC_VERSION} is newer than CUDA "
+                "${CUDAToolkit_VERSION} officially supports - adding "
+                "-allow-unsupported-compiler. Run the GPU tests to confirm "
+                "the combination works, or install a CUDA release that "
+                "supports this Visual Studio version.")
+            string(APPEND CMAKE_CUDA_FLAGS " -allow-unsupported-compiler")
+        endif()
         # Enable CUDA language
         enable_language(CUDA)
     else()
@@ -64,14 +111,16 @@ else()
     message(STATUS "SDFGen: GPU build disabled")
 endif()
 
-# Generate config.h from config.h.in
+# Generate config.h into a dedicated directory so a stale copy in the
+# source tree can never shadow it.
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/config.h"
 )
 
-# Make generated config.h available to all subdirectories
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+# config.h is exposed only through sdfgen_options (target-based, no
+# directory-scope include_directories).
+target_include_directories(sdfgen_options INTERFACE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
 # ============================================================================
 # Output Directories
@@ -99,9 +148,11 @@ add_subdirectory(app)
 # Build utility tools
 add_subdirectory(sdf_to_mesh)
 
-# Always build tests
-enable_testing()
-add_subdirectory(tests)
+# Tests (skipped when embedding, e.g. pip install sets BUILD_TESTING=OFF)
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # Conditionally build Python bindings
 if(BUILD_PYTHON_BINDINGS)
@@ -111,9 +162,13 @@ endif()
 # ============================================================================
 # Installation
 # ============================================================================
-install(TARGETS SDFGen
-    RUNTIME DESTINATION bin
-)
+# Skip the CLI install when building a Python wheel (scikit-build-core
+# defines SKBUILD); the wheel must contain only the Python package.
+if(NOT SKBUILD)
+    install(TARGETS SDFGen
+        RUNTIME DESTINATION bin
+    )
+endif()
 
 # ============================================================================
 # Build Summary
