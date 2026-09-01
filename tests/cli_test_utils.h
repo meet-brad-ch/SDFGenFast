@@ -25,9 +25,7 @@ namespace cli_test {
  */
 struct CommandResult {
     int32_t exit_code = -1;          ///< Process exit code (-1 if not run)
-    std::string stdout_output;       ///< Captured standard output
-    std::string stderr_output;       ///< Captured standard error (if captured separately)
-    bool timed_out = false;          ///< Whether command exceeded timeout limit
+    std::string stdout_output;       ///< Captured output (stderr is merged into stdout)
     bool execution_failed = false;   ///< Whether process execution itself failed (not exit code)
 };
 
@@ -39,18 +37,19 @@ struct CommandResult {
 struct TestConfig {
     std::string sdfgen_exe_path;     ///< Path to SDFGen executable (e.g., "SDFGen.exe")
     std::string test_resources_dir;  ///< Path to test resources directory containing test meshes
-    int32_t timeout_seconds = 120;   ///< Maximum execution time before killing process
     bool verbose = false;            ///< If true, print command output during execution
 };
 
 /**
  * @brief Execute SDFGen with given arguments
  *
- * Spawns the SDFGen executable as a subprocess with specified arguments, captures output,
- * and enforces timeout limits. Cross-platform implementation supporting Windows and Unix systems.
+ * Spawns the SDFGen executable as a subprocess with specified arguments and captures
+ * output. Cross-platform implementation supporting Windows and Unix systems.
+ * Timeouts are enforced by CTest (see the TIMEOUT properties in tests/CMakeLists.txt),
+ * not by this function.
  *
  * @param args Command-line arguments to pass to SDFGen (without executable name)
- * @param config Test configuration including executable path and timeout
+ * @param config Test configuration including executable path
  * @return CommandResult with exit code, captured output, and execution status
  */
 CommandResult run_sdfgen(

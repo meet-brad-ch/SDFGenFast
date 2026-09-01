@@ -8,11 +8,11 @@
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/tuple.h>
 
-#include "../common/sdfgen_unified.h"
-#include "../common/mesh_io.h"
-#include "../common/sdf_io.h"
-#include "../common/array3.h"
-#include "../common/vec.h"
+#include "sdfgen_unified.h"
+#include "mesh_io.h"
+#include "sdf_io.h"
+#include "array3.h"
+#include "vec.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -89,8 +89,6 @@ nb::ndarray<nb::numpy, float> array3f_to_numpy(const Array3f& arr) {
     nb::capsule owner(data, [](void* p) noexcept {
         delete[] static_cast<float*>(p);
     });
-
-    size_t shape[3] = {ni, nj, nk};
 
     return nb::ndarray<nb::numpy, float>(
         data, {ni, nj, nk}, owner
@@ -256,14 +254,6 @@ void save_sdf(
         nb::cast<float>(origin[2])
     );
 
-    // Compute bounds
-    Vec3f max_box(
-        origin_vec[0] + dx * nx,
-        origin_vec[1] + dx * ny,
-        origin_vec[2] + dx * nz
-    );
-
-    // Compute dx from the metadata
     // Save using existing I/O function
     bool success = write_sdf_binary(
         filename,

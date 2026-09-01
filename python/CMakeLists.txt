@@ -1,5 +1,4 @@
 # Python bindings for SDFGen using nanobind
-cmake_minimum_required(VERSION 3.20)
 
 # Find Python and nanobind
 find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
@@ -26,21 +25,18 @@ endif()
 # Create the Python extension module
 nanobind_add_module(sdfgen_ext sdfgen_py.cpp)
 
-# Link against sdfgen libraries
+# sdfgen_common transitively provides sdfgen_cpu (and sdfgen_gpu when built).
+# Note: sdfgen_options is deliberately not linked; nanobind's generated glue
+# is not warning-clean at /W4, and the module carries no first-party warnings
+# surface beyond sdfgen_py.cpp.
 target_link_libraries(sdfgen_ext PRIVATE
     sdfgen_common
-    sdfgen_cpu
 )
-
-# Link GPU library if available
-if(HAVE_CUDA)
-    target_link_libraries(sdfgen_ext PRIVATE sdfgen_gpu)
-endif()
-
-# Set C++ standard
 target_compile_features(sdfgen_ext PRIVATE cxx_std_17)
 
 # Post-build: Create ready-to-use package structure at project root
+# (developer convenience only; the directory is gitignored). The installed
+# wheel gets its files from the install() rules at the end of this file.
 # This allows pytest and Python imports to work immediately after build
 set(SDFGEN_PACKAGE_DIR "${PROJECT_SOURCE_DIR}/sdfgen")
 
@@ -80,5 +76,11 @@ if(WIN32 AND HAVE_CUDA AND CUDAToolkit_FOUND)
     endif()
 endif()
 
-# Install the extension module
+# Install rules - these define the wheel contents (scikit-build-core installs
+# into wheel.install-dir = "sdfgen"). The high-level API sdfgen.py must ship
+# as the package __init__.py or `pip install .` yields a broken package.
 install(TARGETS sdfgen_ext LIBRARY DESTINATION .)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/sdfgen.py" DESTINATION . RENAME __init__.py)
+if(WIN32 AND HAVE_CUDA AND CUDAToolkit_FOUND AND EXISTS "${CUDART_DLL_PATH}")
+    install(FILES "${CUDART_DLL_PATH}" DESTINATION .)
+endif()

@@ -5,17 +5,16 @@
 // CLI testing utilities implementation
 
 #include "cli_test_utils.h"
+#include <stdexcept>
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <sys/stat.h>
 
 #ifdef _WIN32
     #include <io.h>
-    #include <direct.h>
     #include <stdlib.h>  // for _fullpath, _MAX_PATH
     #define popen _popen
     #define pclose _pclose
@@ -24,7 +23,10 @@
     #define F_OK 0
 #else
     #include <unistd.h>
-    #include <linux/limits.h>  // for PATH_MAX
+    #include <limits.h>
+    #ifndef PATH_MAX
+        #define PATH_MAX 4096
+    #endif
 #endif
 
 namespace cli_test {
@@ -77,8 +79,13 @@ CommandResult run_sdfgen(
     int32_t status = pclose(pipe);
 
 #ifdef _WIN32
-    // On Windows, pclose returns the exit code directly
+    // On Windows, _pclose returns the exit code directly, or -1 when it
+    // could not obtain one (indistinguishable from a child returning -1;
+    // treat it as an execution failure since SDFGen never returns -1).
     result.exit_code = status;
+    if (status == -1) {
+        result.execution_failed = true;
+    }
 #else
     // On Unix, need to extract exit code from status
     if (WIFEXITED(status)) {
@@ -201,13 +208,15 @@ static bool directory_exists(const std::string& path) {
 }
 
 // Helper function to find the test resources directory
-// Searches multiple possible locations to support running tests from any directory
+// The build system passes the absolute source location; the relative
+// candidates keep manually copied binaries working.
 static std::string find_resources_directory() {
     // List of possible resource locations (in priority order)
     const char* candidates[] = {
-        "./resources/",           // Running from tests/ directory or build-Release/bin/ (with copied resources)
-        "../../tests/resources/", // Running from build-Release/bin/ (without copied resources)
-        "../resources/",          // Edge case: running from build-Release/
+#ifdef SDFGEN_TEST_RESOURCES_DIR
+        SDFGEN_TEST_RESOURCES_DIR,  // Absolute path baked in by CMake
+#endif
+        "./resources/",           // Running next to a copied resources/ directory
         "resources/",             // Fallback relative path
     };
 
@@ -232,85 +241,19 @@ static std::string find_resources_directory() {
 TestConfig get_default_test_config() {
     TestConfig config;
 
-    // Resolve paths - use absolute paths on Windows to avoid popen() issues
-#ifdef _WIN32
-    char abs_exe_path[_MAX_PATH];
-
-    // Try multiple possible locations for SDFGen.exe
-    const char* exe_candidates[] = {
-        "../build-Release/bin/SDFGen.exe",  // From tests/ directory
-        "./SDFGen.exe",                      // From build-Release/bin/ directory
-        "SDFGen.exe",                        // Current directory
-    };
-
-    bool exe_found = false;
-    for (const char* candidate : exe_candidates) {
-        if (_fullpath(abs_exe_path, candidate, _MAX_PATH) != nullptr) {
-            // Check if file exists
-            if (_access(abs_exe_path, F_OK) == 0) {
-                config.sdfgen_exe_path = abs_exe_path;
-                exe_found = true;
-                break;
-            }
-        }
-    }
-
-    if (!exe_found) {
-        // Fallback
-        config.sdfgen_exe_path = "SDFGen.exe";
-    }
+    // The build system bakes in the real binary location; a bare name on
+    // PATH is the last resort for manually deployed test binaries.
+#ifdef SDFGEN_BINARY_PATH
+    config.sdfgen_exe_path = SDFGEN_BINARY_PATH;
+#elif defined(_WIN32)
+    config.sdfgen_exe_path = "SDFGen.exe";
 #else
-    // Unix: Get the directory containing this test executable and look for SDFGen there
-    char exe_path[PATH_MAX];
-    ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
-
-    bool exe_found = false;
-    if (len != -1) {
-        exe_path[len] = '\0';
-        // Get directory by finding last '/'
-        char* last_slash = strrchr(exe_path, '/');
-        if (last_slash != nullptr) {
-            *last_slash = '\0';  // Null terminate at last slash to get directory
-            std::string sdfgen_path = std::string(exe_path) + "/SDFGen";
-
-            // Check if SDFGen exists in the same directory as the test executable
-            if (access(sdfgen_path.c_str(), F_OK) == 0) {
-                config.sdfgen_exe_path = sdfgen_path;
-                exe_found = true;
-            }
-        }
-    }
-
-    if (!exe_found) {
-        // Fallback: try relative paths
-        const char* exe_candidates[] = {
-            "./SDFGen",                      // From build-Release/bin/ directory
-            "../build-Release/bin/SDFGen",   // From tests/ directory
-        };
-
-        for (const char* candidate : exe_candidates) {
-            if (access(candidate, F_OK) == 0) {
-                // Convert to absolute path for reliability
-                char abs_path[PATH_MAX];
-                if (realpath(candidate, abs_path) != nullptr) {
-                    config.sdfgen_exe_path = abs_path;
-                    exe_found = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    if (!exe_found) {
-        // Last resort fallback
-        config.sdfgen_exe_path = "SDFGen";
-    }
+    config.sdfgen_exe_path = "SDFGen";
 #endif
 
     // Find resources directory (works from any location)
     config.test_resources_dir = find_resources_directory();
 
-    config.timeout_seconds = 120;
     config.verbose = false;
 
     return config;
@@ -342,12 +285,12 @@ void assert_exit_code(
     const std::string& test_name
 ) {
     if (result.execution_failed) {
-        std::cerr << "✗ " << test_name << " FAILED: Command execution failed\n";
+        std::cerr << "[FAIL] " << test_name << " FAILED: Command execution failed\n";
         throw std::runtime_error("Command execution failed");
     }
 
     if (result.exit_code != expected_code) {
-        std::cerr << "✗ " << test_name << " FAILED: Expected exit code "
+        std::cerr << "[FAIL] " << test_name << " FAILED: Expected exit code "
                   << expected_code << ", got " << result.exit_code << "\n";
         std::cerr << "Output: " << result.stdout_output << "\n";
         throw std::runtime_error("Exit code mismatch");
@@ -359,7 +302,7 @@ void assert_file_exists(
     const std::string& test_name
 ) {
     if (!file_exists(path)) {
-        std::cerr << "✗ " << test_name << " FAILED: Expected file does not exist: "
+        std::cerr << "[FAIL] " << test_name << " FAILED: Expected file does not exist: "
                   << path << "\n";
         throw std::runtime_error("File not found");
     }
@@ -371,7 +314,7 @@ void assert_output_contains(
     const std::string& test_name
 ) {
     if (!string_contains(result.stdout_output, expected_text)) {
-        std::cerr << "✗ " << test_name << " FAILED: Output does not contain '"
+        std::cerr << "[FAIL] " << test_name << " FAILED: Output does not contain '"
                   << expected_text << "'\n";
         std::cerr << "Actual output: " << result.stdout_output << "\n";
         throw std::runtime_error("Output text not found");
@@ -386,12 +329,12 @@ void assert_sdf_dimensions(
     const std::string& test_name
 ) {
     if (!info.valid) {
-        std::cerr << "✗ " << test_name << " FAILED: SDF file is invalid\n";
+        std::cerr << "[FAIL] " << test_name << " FAILED: SDF file is invalid\n";
         throw std::runtime_error("Invalid SDF file");
     }
 
     if (info.nx != expected_nx || info.ny != expected_ny || info.nz != expected_nz) {
-        std::cerr << "✗ " << test_name << " FAILED: Expected dimensions "
+        std::cerr << "[FAIL] " << test_name << " FAILED: Expected dimensions "
                   << expected_nx << "x" << expected_ny << "x" << expected_nz
                   << ", got " << info.nx << "x" << info.ny << "x" << info.nz << "\n";
         throw std::runtime_error("Dimension mismatch");

@@ -4,10 +4,10 @@
 
 #include "sdfgen_unified.h"
 #include "config.h"
-#include "../cpu_lib/makelevelset3.h"
+#include "makelevelset3.h"
 
 #ifdef HAVE_CUDA
-#include "../gpu_lib/makelevelset3_gpu.h"
+#include "makelevelset3_gpu.h"
 #include <cuda_runtime.h>
 #endif
 

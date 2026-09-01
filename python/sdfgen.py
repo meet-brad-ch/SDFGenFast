@@ -21,7 +21,7 @@ Basic usage:
     >>> sdfgen.save_sdf("output.sdf", sdf, origin=(0, 0, 0), dx=0.01)
 """
 
-__version__ = "1.0.0"
+__version__ = "2.2.0"
 __author__ = "Brad Chamberlain, Christopher Batty"
 __license__ = "MIT"
 
@@ -41,7 +41,7 @@ except ImportError as e:
     ) from e
 
 import numpy as np
-from typing import Tuple, Optional, Union
+from typing import Tuple, Optional
 
 
 def generate_from_mesh(
