@@ -445,7 +445,7 @@ int main(int argc, char* argv[]) {
 
                 // Create triangles
                 for (int t = 0; triTable[cubeIndex][t] != -1; t += 3) {
-                    int baseIdx = vertices.size();
+                    int baseIdx = (int)vertices.size();
                     vertices.push_back(vertList[triTable[cubeIndex][t]]);
                     vertices.push_back(vertList[triTable[cubeIndex][t+1]]);
                     vertices.push_back(vertList[triTable[cubeIndex][t+2]]);

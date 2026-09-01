@@ -15,14 +15,14 @@ void test_mode1_threads(const cli_test::TestConfig& config) {
 
     // Test with 1 thread
     std::cout << "\nTesting with 1 thread...\n";
-    std::vector<std::string> args1 = {"resources/test_x3y4z5_quads.obj", "0.1", "2", "1"};
+    std::vector<std::string> args1 = {"resources/test_x3y4z5_quads.obj", "0.1", "2", "-t", "1"};
     auto result1 = cli_test::run_sdfgen(args1, config);
 
     if(result1.exit_code != 0) {
         std::cerr << "ERROR: Command failed with exit code " << result1.exit_code << "\n";
         exit(1);
     }
-    if(!cli_test::string_contains(result1.stdout_output, "CPU threads: 1")) {
+    if(!cli_test::string_contains(result1.stdout_output, "Threads: 1")) {
         std::cerr << "ERROR: Thread count not reported in output\n";
         exit(1);
     }
@@ -30,14 +30,14 @@ void test_mode1_threads(const cli_test::TestConfig& config) {
 
     // Test with 10 threads
     std::cout << "\nTesting with 10 threads...\n";
-    std::vector<std::string> args10 = {"resources/test_x3y4z5_quads.obj", "0.1", "2", "10"};
+    std::vector<std::string> args10 = {"resources/test_x3y4z5_quads.obj", "0.1", "2", "-t", "10"};
     auto result10 = cli_test::run_sdfgen(args10, config);
 
     if(result10.exit_code != 0) {
         std::cerr << "ERROR: Command failed with exit code " << result10.exit_code << "\n";
         exit(1);
     }
-    if(!cli_test::string_contains(result10.stdout_output, "CPU threads: 10")) {
+    if(!cli_test::string_contains(result10.stdout_output, "Threads: 10")) {
         std::cerr << "ERROR: Thread count not reported in output\n";
         exit(1);
     }
@@ -45,14 +45,14 @@ void test_mode1_threads(const cli_test::TestConfig& config) {
 
     // Test with 0 (auto-detect)
     std::cout << "\nTesting with 0 (auto-detect)...\n";
-    std::vector<std::string> args0 = {"resources/test_x3y4z5_quads.obj", "0.1", "2", "0"};
+    std::vector<std::string> args0 = {"resources/test_x3y4z5_quads.obj", "0.1", "2", "-t", "0"};
     auto result0 = cli_test::run_sdfgen(args0, config);
 
     if(result0.exit_code != 0) {
         std::cerr << "ERROR: Command failed with exit code " << result0.exit_code << "\n";
         exit(1);
     }
-    if(!cli_test::string_contains(result0.stdout_output, "CPU threads: auto-detect")) {
+    if(!cli_test::string_contains(result0.stdout_output, "Threads: auto")) {
         std::cerr << "ERROR: Auto-detect not reported in output\n";
         exit(1);
     }
@@ -68,14 +68,14 @@ void test_mode2a_threads(const cli_test::TestConfig& config) {
 
     // Test with padding and threads
     std::cout << "\nTesting STL with Nx, padding, and threads...\n";
-    std::vector<std::string> args = {"resources/test_x3y4z5_bin.stl", "32", "1", "5"};
+    std::vector<std::string> args = {"resources/test_x3y4z5_bin.stl", "32", "-p", "1", "-t", "5"};
     auto result = cli_test::run_sdfgen(args, config);
 
     if(result.exit_code != 0) {
         std::cerr << "ERROR: Command failed with exit code " << result.exit_code << "\n";
         exit(1);
     }
-    if(!cli_test::string_contains(result.stdout_output, "CPU threads: 5")) {
+    if(!cli_test::string_contains(result.stdout_output, "Threads: 5")) {
         std::cerr << "ERROR: Thread count not reported in output\n";
         exit(1);
     }
@@ -89,21 +89,21 @@ void test_mode2b_threads(const cli_test::TestConfig& config) {
 
     // Test with padding and threads
     std::cout << "\nTesting STL with Nx/Ny/Nz, padding, and threads...\n";
-    std::vector<std::string> args = {"resources/test_x3y4z5_bin.stl", "32", "32", "32", "1", "8"};
+    std::vector<std::string> args = {"resources/test_x3y4z5_bin.stl", "32", "32", "32", "-p", "1", "-t", "8"};
     auto result = cli_test::run_sdfgen(args, config);
 
     if(result.exit_code != 0) {
         std::cerr << "ERROR: Command failed with exit code " << result.exit_code << "\n";
         exit(1);
     }
-    if(!cli_test::string_contains(result.stdout_output, "CPU threads: 8")) {
+    if(!cli_test::string_contains(result.stdout_output, "Threads: 8")) {
         std::cerr << "ERROR: Thread count not reported in output\n";
         exit(1);
     }
     std::cout << "✓ Mode 2b with threads accepted\n";
 }
 
-int main(int argc, char* argv[]) {
+int main() {
     std::cout << "========================================\n";
     std::cout << "CLI Thread Count Parameter Test\n";
     std::cout << "========================================\n\n";

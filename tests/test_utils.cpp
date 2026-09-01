@@ -100,7 +100,10 @@ SDFComparisonResult compare_sdf_grids(
     // Compare SDF values
     result.total_cells = phi_cpu.ni * phi_cpu.nj * phi_cpu.nk;
     result.mismatch_count = 0;
+    result.sign_mismatch_count = 0;
     result.max_diff = 0.0f;
+    result.near_band_max_diff = 0.0f;
+    const float near_band = NEAR_BAND_CELLS * dx;
 
     for (int32_t k = 0; k < phi_cpu.nk; ++k) {
         for (int32_t j = 0; j < phi_cpu.nj; ++j) {
@@ -111,6 +114,24 @@ SDFComparisonResult compare_sdf_grids(
 
                 if (diff > result.max_diff) {
                     result.max_diff = diff;
+                }
+
+                // Near band: both backends compute exact triangle distances
+                // here, so they must agree tightly.
+                if (std::abs(cpu_val) <= near_band && diff > result.near_band_max_diff) {
+                    result.near_band_max_diff = diff;
+                }
+
+                // Inside/outside disagreement away from the surface is a
+                // sign-determination bug, never a solver difference. Cells
+                // within tolerance of the surface may flip legitimately.
+                if ((cpu_val < 0.0f) != (gpu_val < 0.0f) &&
+                    std::abs(cpu_val) > result.tolerance) {
+                    if (result.sign_mismatch_count < MAX_MISMATCH_PRINT && verbose) {
+                        std::cerr << "  SIGN mismatch at (" << i << "," << j << "," << k << "): "
+                                  << "CPU=" << cpu_val << ", GPU=" << gpu_val << "\n";
+                    }
+                    result.sign_mismatch_count++;
                 }
 
                 if (diff > result.tolerance) {

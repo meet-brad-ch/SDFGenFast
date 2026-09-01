@@ -38,10 +38,12 @@ static float length(const Vec3f& v) {
     return std::sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
 }
 
-static DetailedAnalysis analyze_mesh_detailed(const std::vector<Vec3f>& vertices,
+// The vertex list is unused: the analysis is purely topological
+// (edge/face connectivity only).
+static DetailedAnalysis analyze_mesh_detailed(const std::vector<Vec3f>& /*vertices*/,
                                                const std::vector<Vec3ui>& faces) {
     DetailedAnalysis result;
-    int numTriangles = faces.size();
+    int numTriangles = (int)faces.size();
 
     // Count triangles per edge
     for (int t = 0; t < numTriangles; t++) {
@@ -54,14 +56,14 @@ static DetailedAnalysis analyze_mesh_detailed(const std::vector<Vec3f>& vertices
         result.edge_triangles[Edge(i2, i0)].push_back(t);
     }
 
-    result.summary.total_edges = result.edge_triangles.size();
+    result.summary.total_edges = (int)result.edge_triangles.size();
 
     // Classify edges and build boundary adjacency
     std::set<unsigned int> boundary_vertices;
     std::map<unsigned int, std::vector<unsigned int>> boundary_adj;
 
     for (auto& kv : result.edge_triangles) {
-        int count = kv.second.size();
+        int count = (int)kv.second.size();
         if (count == 1) {
             result.summary.boundary_edges++;
             boundary_vertices.insert(kv.first.v1);
@@ -105,7 +107,7 @@ static DetailedAnalysis analyze_mesh_detailed(const std::vector<Vec3f>& vertices
         }
     }
 
-    result.summary.num_holes = result.boundary_loops.size();
+    result.summary.num_holes = (int)result.boundary_loops.size();
     result.summary.is_manifold = (result.summary.non_manifold_edges == 0);
     result.summary.is_watertight = (result.summary.boundary_edges == 0 && result.summary.is_manifold);
 
@@ -117,7 +119,7 @@ MeshAnalysis analyze_mesh(const std::vector<Vec3f>& vertices,
     return analyze_mesh_detailed(vertices, faces).summary;
 }
 
-void print_mesh_analysis(const MeshAnalysis& analysis, bool verbose) {
+void print_mesh_analysis(const MeshAnalysis& analysis, bool /*verbose*/) {
     std::cout << "\n";
     std::cout << "Mesh Analysis:\n";
     std::cout << "  Total edges:        " << analysis.total_edges << "\n";
@@ -231,7 +233,7 @@ int weld_vertices(std::vector<Vec3f>& vertices,
             vertex_map[i] = found_idx;
             welded++;
         } else {
-            int new_idx = new_vertices.size();
+            int new_idx = (int)new_vertices.size();
             new_vertices.push_back(v);
             vertex_map[i] = new_idx;
             auto key = std::make_tuple(gx, gy, gz);

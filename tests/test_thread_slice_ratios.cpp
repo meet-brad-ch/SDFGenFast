@@ -225,7 +225,7 @@ void test_extreme_cases() {
     }
 }
 
-int main(int argc, char* argv[]) {
+int main() {
     std::cout << "========================================\n";
     std::cout << "Thread/Slice Ratio Edge Case Tests\n";
     std::cout << "========================================\n";

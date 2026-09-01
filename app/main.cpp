@@ -26,18 +26,18 @@
 
 int main(int argc, char* argv[]) {
 
-  CLI::App app{"SDFGen - Generate signed distance fields from triangle meshes"};
+  CLI::App app{"SDFGen - Generate signed distance fields from triangle meshes. \n"              "Hardware Acceleration: a CUDA GPU is detected and used automatically \n"              "when available. Use --cpu to force the CPU backend."};
 
   // Positional arguments
   std::string filename;
-  std::vector<float> dimensions;  // Can be: [dx, padding] for OBJ, or [Nx], [Nx,pad], [Nx,Ny,Nz], [Nx,Ny,Nz,pad] for STL
+  std::vector<float> dimensions;  // OBJ: [dx] or [dx, padding]. STL: [Nx], [Nx, padding], [Nx, Ny, Nz], or [Nx, Ny, Nz, padding].
 
   app.add_option("input", filename, "Input mesh file (.obj or .stl)")
       ->required()
       ->check(CLI::ExistingFile);
   app.add_option("dimensions", dimensions, "Grid dimensions:\n"
-      "  OBJ: <dx> <padding>           - cell size and padding\n"
-      "  STL: <Nx> [Ny Nz] [padding]   - grid size (proportional or manual)")
+      "  OBJ: <dx> [padding]  - cell size, optional padding cells\n"
+      "  STL: <Nx> [padding] or <Nx Ny Nz> [padding]  - grid size; padding also via -p")
       ->expected(1, 4);
 
   // Optional flags
@@ -60,9 +60,10 @@ int main(int argc, char* argv[]) {
 
   // Detect file type
   std::string ext = filename.substr(filename.find_last_of(".") + 1);
-  std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+  std::transform(ext.begin(), ext.end(), ext.begin(),
+                 [](unsigned char c) { return static_cast<char>(::tolower(c)); });
   bool is_stl = (ext == "stl");
-  bool mode_precise = is_stl;  // STL uses grid dimensions, OBJ uses dx
+  bool use_grid_dimensions = is_stl;  // STL mode sizes by grid dimensions, OBJ mode by cell size dx
 
   // Validate dimensions
   if (dimensions.empty()) {
@@ -83,7 +84,7 @@ int main(int argc, char* argv[]) {
   std::cout << "SDFGen - SDF Generation Tool\n";
   std::cout << "========================================\n\n";
 
-  if(mode_precise) {
+  if(use_grid_dimensions) {
     // === MODE 2: STL with grid dimensions ===
     std::cout << "Mode: Grid dimensions (STL)\n";
     std::cout << "Input: " << filename << "\n\n";
@@ -96,12 +97,15 @@ int main(int argc, char* argv[]) {
 
     Vec3f mesh_size = max_box - min_box;
 
-    // Parse dimensions: [Nx] or [Nx, Ny, Nz]
+    // Parse dimensions: [Nx], [Nx, padding], or [Nx, Ny, Nz].
+    // Two positionals are unambiguous: Nx+Ny without Nz is never valid, so
+    // the second value can only be padding (original grammar, kept for
+    // backwards compatibility). An explicit -p wins over the positional.
     if (dimensions.size() == 1 || dimensions.size() == 2) {
-      // Proportional mode: Nx only (optional padding in dimensions[1] for backwards compat)
+      // Proportional mode: Nx only
       target_nx = (int)dimensions[0];
-      if (dimensions.size() == 2 && dimensions[1] < 20) {
-        padding = (int)dimensions[1];  // Backwards compat: SDFGen mesh.stl 256 2
+      if (dimensions.size() == 2 && app.count("--padding") == 0) {
+        padding = (int)dimensions[1];
       }
 
       if(target_nx <= 0) {
@@ -122,10 +126,14 @@ int main(int argc, char* argv[]) {
       std::cout << "Calculated grid: " << target_nx << " x " << target_ny << " x " << target_nz << "\n";
 
     } else if (dimensions.size() >= 3) {
-      // Manual mode: Nx, Ny, Nz
+      // Manual mode: Nx, Ny, Nz, optional positional padding (the old
+      // grammar advertised the 4th value but silently ignored it).
       target_nx = (int)dimensions[0];
       target_ny = (int)dimensions[1];
       target_nz = (int)dimensions[2];
+      if (dimensions.size() == 4 && app.count("--padding") == 0) {
+        padding = (int)dimensions[3];
+      }
 
       if(target_nx <= 0 || target_ny <= 0 || target_nz <= 0) {
         std::cerr << "Error: Grid dimensions must be positive integers.\n";
@@ -161,8 +169,8 @@ int main(int argc, char* argv[]) {
     }
 
     dx = dimensions[0];
-    if (dimensions.size() >= 2) {
-      padding = (int)dimensions[1];  // Backwards compat
+    if (dimensions.size() >= 2 && app.count("--padding") == 0) {
+      padding = (int)dimensions[1];  // Original SDFGen grammar: <dx> <padding>
     }
     if(padding < 1) padding = 1;
 
@@ -205,7 +213,7 @@ int main(int argc, char* argv[]) {
 
   // Add padding around the box and compute final grid dimensions
   Vec3ui sizes;
-  if(mode_precise) {
+  if(use_grid_dimensions) {
     // Use exact target dimensions
     sizes = Vec3ui(target_nx, target_ny, target_nz);
 
@@ -257,9 +265,9 @@ int main(int argc, char* argv[]) {
 
   #ifdef HAVE_VTK
     // VTK output mode
-    if(mode_precise) {
+    if(use_grid_dimensions) {
       char dims[64];
-      sprintf(dims, "_sdf_%dx%dx%d", phi_grid.ni, phi_grid.nj, phi_grid.nk);
+      snprintf(dims, sizeof(dims), "_sdf_%dx%dx%d", phi_grid.ni, phi_grid.nj, phi_grid.nk);
       outname = base_filename + std::string(dims) + ".vti";
     } else {
       outname = base_filename + ".vti";
@@ -295,10 +303,10 @@ int main(int argc, char* argv[]) {
 
   #else
     // Binary SDF output (no VTK)
-    if(mode_precise) {
+    if(use_grid_dimensions) {
       char dims[128];
-      // Proportional or manual mode: hill_sdf_615x615x113.sdf
-      sprintf(dims, "_sdf_%dx%dx%d", phi_grid.ni, phi_grid.nj, phi_grid.nk);
+      // Grid dimensions become part of the name: mesh_sdf_32x42x52.sdf
+      snprintf(dims, sizeof(dims), "_sdf_%dx%dx%d", phi_grid.ni, phi_grid.nj, phi_grid.nk);
       outname = base_filename + std::string(dims) + ".sdf";
     } else {
       outname = base_filename + ".sdf";
@@ -322,7 +330,7 @@ int main(int argc, char* argv[]) {
     std::cout << "File: " << outname << "\n";
     std::cout << "Dimensions: " << phi_grid.ni << " x " << phi_grid.nj << " x " << phi_grid.nk << "\n";
 
-    if(mode_precise) {
+    if(use_grid_dimensions) {
       bool exact_match = (phi_grid.ni == target_nx && phi_grid.nj == target_ny && phi_grid.nk == target_nz);
       std::cout << "Target dimensions: " << target_nx << " x " << target_ny << " x " << target_nz << "\n";
       std::cout << "Match: " << (exact_match ? "OK" : "FAIL") << "\n";
@@ -331,7 +339,10 @@ int main(int argc, char* argv[]) {
     std::cout << "Grid spacing (dx): " << dx << "\n";
     std::cout << "Bounds: (" << min_box << ") to (" << max_box << ")\n";
     std::cout << "Inside cells: " << inside_count << " / " << total_count;
-    std::cout << " (" << (100.0f * inside_count / total_count) << "%)\n";
+    if (total_count > 0) {
+      std::cout << " (" << (100.0f * inside_count / total_count) << "%)";
+    }
+    std::cout << "\n";
 
     long long file_size_bytes = 36 + (long long)total_count * sizeof(float);
     float file_size_mb = file_size_bytes / (1024.0f * 1024.0f);

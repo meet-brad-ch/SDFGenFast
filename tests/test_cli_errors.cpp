@@ -56,11 +56,10 @@ bool test_too_few_arguments() {
     TestConfig config = get_default_test_config();
     config.verbose = true;
 
-    // Mode 1 requires 3 args, provide only 2
+    // A mesh file without any grid dimensions is an error
     std::vector<std::string> args = {
-        config.test_resources_dir + "test_x3y4z5_quads.obj",
-        "0.1"
-        // Missing: padding
+        config.test_resources_dir + "test_x3y4z5_quads.obj"
+        // Missing: dx (OBJ mode) or Nx (STL mode)
     };
 
     CommandResult result = run_sdfgen(args, config);

@@ -78,25 +78,32 @@ __device__ inline DistTriPair unpack_dist_tri(unsigned long long packed) {
 }
 
 /**
- * @brief Compute minimum of three floats
+ * @brief Compute minimum of three values
+ *
+ * Double precision on purpose: the callers pass double grid coordinates,
+ * and the CPU implementation performs this computation in double. A float
+ * version would truncate before the ceil/floor that select the
+ * intersection band and could flip inside/outside signs on
+ * large-coordinate meshes.
+ *
  * @param a First value
  * @param b Second value
  * @param c Third value
  * @return Minimum of a, b, c
  */
-__device__ inline float fmin3(float a, float b, float c) {
-    return fminf(fminf(a, b), c);
+__device__ inline double fmin3(double a, double b, double c) {
+    return fmin(fmin(a, b), c);
 }
 
 /**
- * @brief Compute maximum of three floats
+ * @brief Compute maximum of three values (double precision, see fmin3)
  * @param a First value
  * @param b Second value
  * @param c Third value
  * @return Maximum of a, b, c
  */
-__device__ inline float fmax3(float a, float b, float c) {
-    return fmaxf(fmaxf(a, b), c);
+__device__ inline double fmax3(double a, double b, double c) {
+    return fmax(fmax(a, b), c);
 }
 
 /**
