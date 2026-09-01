@@ -144,18 +144,22 @@ void print_analysis(const std::vector<BenchmarkResult>& results) {
     std::cout << "\n";
 }
 
-int main(int argc, char* argv[]) {
+int main() {
     print_header();
 
-    // Load test mesh
-    const char* mesh_file = "resources/test_x3y4z5_bin.stl";
+    // Load test mesh (path baked in by CMake, falls back to relative for manual runs)
+#ifdef SDFGEN_TEST_RESOURCES_DIR
+    const std::string mesh_file = std::string(SDFGEN_TEST_RESOURCES_DIR) + "test_x3y4z5_bin.stl";
+#else
+    const std::string mesh_file = "resources/test_x3y4z5_bin.stl";
+#endif
     std::cout << "Loading test mesh: " << mesh_file << "\n\n";
 
     std::vector<Vec3f> verts;
     std::vector<Vec3ui> faces;
     Vec3f min_box, max_box;
 
-    if (!meshio::load_stl(mesh_file, verts, faces, min_box, max_box)) {
+    if (!meshio::load_stl(mesh_file.c_str(), verts, faces, min_box, max_box)) {
         std::cerr << "ERROR: Failed to load test mesh\n";
         return 1;
     }

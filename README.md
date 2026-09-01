@@ -1,91 +1,86 @@
 # SDFGen
 
-A high-performance command-line utility and Python library for generating grid-based signed distance fields (SDFs) from triangle meshes.
+A command-line tool and Python library that generates grid-based signed distance fields (SDFs) from triangle meshes.
 
-**Enhanced fork** of [Christopher Batty's original SDFGen](https://github.com/christopherbatty/SDFGen) with GPU acceleration, automatic hardware detection, Python bindings, and cross-platform build system.
+This is an enhanced fork of [Christopher Batty's SDFGen](https://github.com/christopherbatty/SDFGen). The fork adds GPU acceleration, a multi-threaded CPU path, automatic hardware detection, Python bindings, and a cross-platform CMake build. See [CHANGELOG.md](CHANGELOG.md) for the full list of changes.
 
 ## Features
 
-- **Automatic GPU Acceleration**: Detects and uses CUDA-capable GPUs automatically (no manual flags needed)
-- **Fast CPU Fallback**: Multi-threaded CPU implementation when GPU is unavailable
-- **Mesh Watertightness Check**: Automatic detection of holes and non-manifold edges
-- **Mesh Repair**: Optional hole-filling with `--fix` flag for non-watertight meshes
-- **Python Bindings**: High-performance nanobind-based API with NumPy integration and GPU support
-- **Multiple Input Formats**: Binary/ASCII STL and Wavefront OBJ (quads automatically triangulated)
-- **Flexible Grid Sizing**: Proportional or manual dimension specification
-- **Binary SDF Output**: Compact binary format with metadata header
-- **Cross-Platform**: Windows (MSVC) and Linux (GCC/Clang) with automated build scripts
-- **Comprehensive Testing**: C++ tests + 51 Python tests validating all functionality
+- **Automatic GPU acceleration**: The tool detects a CUDA-capable GPU and uses it. No flags are needed.
+- **Multi-threaded CPU fallback**: The CPU path runs when no GPU is available, or when you pass `--cpu`.
+- **Mesh watertightness check**: The tool always reports holes and non-manifold edges.
+- **Mesh repair**: The `--fix` flag fills holes in non-watertight meshes.
+- **Python bindings**: A nanobind-based API with NumPy integration and GPU support.
+- **Input formats**: Binary STL, ASCII STL, and Wavefront OBJ. Quads are triangulated automatically.
+- **Grid sizing**: Proportional sizing from one dimension, or explicit dimensions.
+- **Binary SDF output**: A compact binary format with a metadata header.
+- **Cross-platform**: Windows (MSVC) and Linux (GCC/Clang).
+- **Tests**: 15 C++ test suites and 51 Python tests.
 
 ## Quick Start
 
 ### Installation
 
-**From source (see [BUILD.md](BUILD.md) for detailed instructions):**
+Build from source. See [BUILD.md](BUILD.md) for full instructions.
 
 ```bash
-# Linux
-cd tools
-./configure.sh Release && ./build.sh
-
-# Windows
-cd tools
-configure.bat Release && build.bat all
+git clone --recurse-submodules https://github.com/meet-radek/SDFGenFast
+cd SDFGenFast
+cmake -B build-Release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-Release
 ```
 
-**Python bindings:**
+Python bindings:
+
 ```bash
 pip install .
 ```
 
 ### CLI Usage
 
-**Mode 1: OBJ files with explicit cell size (dx)**
-```bash
-SDFGen mesh.obj 0.01 2
-```
-- `0.01` = grid cell size (meters)
-- `2` = padding (cells around mesh)
+**OBJ files** take a cell size (`dx`) and an optional padding value:
 
-**Mode 2a: STL files with proportional sizing (Nx only)**
 ```bash
-SDFGen mesh.stl 128 1
-```
-- `128` = target X-dimension
-- `1` = padding
-- Y and Z dimensions calculated proportionally
-
-**Mode 2b: STL files with explicit dimensions**
-```bash
-SDFGen mesh.stl 128 256 64 1
-```
-- Grid dimensions: 128 × 256 × 64
-- `1` = padding
-
-**Optional thread parameter (all modes):**
-```bash
-SDFGen mesh.obj 0.01 2 10    # Use 10 threads
-SDFGen mesh.stl 128 1 0      # Auto-detect thread count
+SDFGen mesh.obj 0.01        # dx = 0.01, padding = 1 (default)
+SDFGen mesh.obj 0.01 2      # dx = 0.01, padding = 2 cells
 ```
 
-**Optional flags:**
+**STL files** take grid dimensions. All dimensions include the padding cells.
+
 ```bash
-SDFGen --fix mesh.stl 128    # Repair non-watertight meshes (fill holes)
-SDFGen --cpu mesh.stl 128    # Force CPU backend (skip GPU)
-SDFGen --fix --cpu mesh.stl 128  # Both flags
+SDFGen mesh.stl 128           # 128 cells in X; Y and Z are proportional
+SDFGen mesh.stl 128 2         # the same, with padding = 2
+SDFGen mesh.stl 128 256 64    # explicit 128 x 256 x 64 grid
+SDFGen mesh.stl 128 256 64 2  # the same, with padding = 2
 ```
 
-**SDF to Mesh conversion** (for debugging/visualization):
+**Flags** (all modes):
+
 ```bash
-sdf_to_mesh input.sdf output.obj           # Extract surface mesh
-sdf_to_mesh input.sdf output.obj -i 0.5    # Extract isosurface at distance 0.5
+SDFGen mesh.stl 128 -p 2    # padding (wins over a positional padding value)
+SDFGen mesh.stl 128 -t 10   # use 10 CPU threads (0 = auto-detect, default)
+SDFGen mesh.stl 128 --fix   # repair non-watertight meshes (fill holes)
+SDFGen mesh.stl 128 --cpu   # force the CPU backend
 ```
 
-**Mesh watertightness** is always checked and reported:
+Run `SDFGen --help` for the full option list.
+
+**SDF to mesh conversion** (for debugging and visualization):
+
+```bash
+sdf_to_mesh input.sdf output.obj           # extract the zero isosurface
+sdf_to_mesh input.sdf output.obj -i 0.5    # extract the isosurface at distance 0.5
+```
+
+**Watertightness** is always checked and reported:
+
 ```
 Mesh Analysis:
-  Boundary edges:     3632 (holes detected)
-  Number of holes:    41
+  Total edges:        17
+  Boundary edges:     4 (holes detected)
+  Non-manifold edges: 0
+  Number of holes:    1
+  Is manifold:        yes
   Is watertight:      NO
 
   WARNING: Mesh is not watertight. SDF sign determination may be incorrect.
@@ -96,14 +91,13 @@ Mesh Analysis:
 
 ```python
 import sdfgen
-import numpy as np
 
-# Generate from file
+# Generate from a file
 sdf, metadata = sdfgen.generate_from_file(
     "mesh.stl",
-    nx=256,           # Proportional sizing
+    nx=256,           # total grid size in X, including padding
     padding=2,
-    backend="auto"    # Uses GPU if available
+    backend="auto"    # uses the GPU when one is available
 )
 
 # Generate from arrays
@@ -115,136 +109,129 @@ sdf = sdfgen.generate_sdf(
     nx=100, ny=100, nz=100
 )
 
-# Save to file
+# Save to a file
 sdfgen.save_sdf("output.sdf", sdf, origin=(0, 0, 0), dx=0.01)
 
 # Check GPU availability
 print(f"GPU available: {sdfgen.is_gpu_available()}")
 ```
 
-**See [python/README.md](python/README.md) for complete API documentation.**
+**Note (changed in 2.2):** `nx`, `ny`, and `nz` are the total grid size, including the padding cells. This matches the CLI. Before 2.2 the Python API added padding on top of the requested size.
+
+See [python/README.md](python/README.md) for the complete API documentation.
 
 ## Hardware Acceleration
 
-SDFGen automatically detects and uses GPU acceleration — **no manual configuration required**.
+SDFGen selects its backend automatically:
 
-**Build-time detection:**
-- CMake searches for CUDA Toolkit during configuration
-- GPU support compiled in automatically if CUDA found
+- **Build time**: CMake searches for the CUDA Toolkit. When it is found, GPU support is compiled in.
+- **Run time**: The tool queries for a CUDA device. When one is present, the GPU backend runs. Otherwise the multi-threaded CPU backend runs.
 
-**Runtime detection:**
-```bash
-./SDFGen mesh.stl 128
+The output names the backend that was used:
+
 ```
-
-Output shows detected hardware:
-```
-Hardware: GPU acceleration available
-Implementation: GPU (CUDA)
+  Hardware: GPU acceleration available
+  Implementation: GPU (CUDA)
 ```
 
 or
 
 ```
-Hardware: No CUDA GPU detected
-Implementation: CPU (multi-threaded)
+  Hardware: No CUDA GPU detected
+  Implementation: CPU (multi-threaded)
 ```
 
-**PyTorch-style simplicity**: No `--gpu` flags, no configuration files. It just works.
+Pass `--cpu` (CLI) or `backend="cpu"` (Python) to force the CPU backend. When you request the GPU explicitly (`backend="gpu"`) and it fails, the error is reported instead of a silent fallback.
 
 ## Performance
 
-**Quick Summary** (Intel i9-13900K + RTX 4090):
+Measured 2026-08-31 on an Intel Core i7-13700KF (16 cores / 24 threads) with an NVIDIA GeForce RTX 4090, CUDA 13.3, Windows 11. The benchmark sizes each grid proportionally from Nx over a 3:4:5 test mesh, so "Nx = 256" is a 256 x 340 x 424 grid.
 
-| Grid Size | CPU (1 thread) | CPU (20 threads) | GPU     | GPU Speedup |
-|-----------|----------------|------------------|---------|-------------|
-| 64³       | 738 ms         | 93 ms            | 111 ms  | 6.7x        |
-| 128³      | 5.98 s         | 748 ms           | 358 ms  | 16.7x       |
-| 256³      | 48.6 s         | 4.18 s           | 1.29 s  | 37.6x       |
+| Nx  | Grid            | Cells | CPU (1 thread) | CPU (10 threads) | CPU (20 threads) | GPU    |
+|-----|-----------------|-------|----------------|------------------|------------------|--------|
+| 64  | 64 x 84 x 104   | 559K  | 698 ms         | 169 ms           | 206 ms           | 71 ms  |
+| 128 | 128 x 169 x 211 | 4.6M  | 5.69 s         | 1.04 s           | 1.21 s           | 386 ms |
+| 256 | 256 x 340 x 424 | 36.9M | 46.1 s         | 7.37 s           | 5.78 s           | 814 ms |
 
-- **Multi-threading scales well** to 10-20 threads
-- **GPU advantage increases** with grid size
-- **Best performance**: GPU for large grids, 10-20 threads for smaller grids
+- The GPU was the fastest backend at every measured size: 2.4x to 7.1x faster than the best CPU time, and 9.9x to 56.6x faster than one thread.
+- The GPU advantage grows with grid size.
 
-**See [Appendix A: Performance Benchmarks](#appendix-a-performance-benchmarks) for detailed results.**
+See [Appendix A](#appendix-a-performance-benchmarks) for the full results and how to reproduce them.
 
 ## Output Format
 
-Binary SDF file format:
+The binary SDF file has a 36-byte header followed by the distance data.
 
 **Header (36 bytes):**
+
 ```
-[Nx, Ny, Nz]           (3 × int32)   - Grid dimensions
-[xmin, ymin, zmin]     (3 × float32) - Bounding box minimum
-[xmax, ymax, zmax]     (3 × float32) - Bounding box maximum
+[Nx, Ny, Nz]           (3 x int32)   - grid dimensions
+[xmin, ymin, zmin]     (3 x float32) - grid bounds minimum
+[xmax, ymax, zmax]     (3 x float32) - grid bounds maximum
 ```
 
-**Data (Nx × Ny × Nz × 4 bytes):**
-```
-float32 distance values in Z-major order
-```
+The cell size is derived from the header: `dx = (xmax - xmin) / Nx`.
+
+**Data (Nx x Ny x Nz x 4 bytes):**
+
+float32 distance values in C order. The Z index varies fastest: the value for cell `(i, j, k)` is at index `(i * Ny + j) * Nz + k`.
 
 **Distance convention:**
-- Negative: Inside the mesh
-- Positive: Outside the mesh
-- Zero: On the surface
+
+- Negative: inside the mesh
+- Positive: outside the mesh
+- Zero: on the surface
 
 ## Testing
 
-**C++ Tests (15 tests):**
-```bash
-# Build tests (if not already built)
-cd tools && ./build.bat all  # or ./build.sh
+**C++ tests** (15 suites, via CTest):
 
-# Run tests
-cd ../build-Release/bin
-./test_correctness.exe
-./test_file_io.exe
-# ... etc (all should show ✓ PASSED)
+```bash
+ctest --test-dir build-Release --output-on-failure
 ```
 
-**Python Tests (51 tests):**
+**Python tests** (51 tests):
+
 ```bash
 pip install pytest
-pytest python/tests/test_sdfgen.py -v
-# Should show: 51 passed
+pytest python/tests -v
 ```
 
-**See [Appendix B: Testing Guide](#appendix-b-testing-guide) for details.**
+See [Appendix B](#appendix-b-testing-guide) for details.
 
 ## Documentation
 
-- **[BUILD.md](BUILD.md)** - Complete build instructions for C++ and Python
-- **[python/README.md](python/README.md)** - Python API documentation and examples
-- **README.md Appendices** (below) - Benchmarks, testing details, and changelog
+- [BUILD.md](BUILD.md) - build instructions for C++ and Python
+- [python/README.md](python/README.md) - Python API documentation and examples
+- [CHANGELOG.md](CHANGELOG.md) - version history and changes relative to the original SDFGen
+- [CONTRIBUTING.md](CONTRIBUTING.md) - how to contribute
 
 ## Project Structure
 
 ```
 SDFGenFast/
 ├── app/              # CLI application
-├── common/           # Shared utilities (unified API, I/O, mesh repair)
-│   ├── mesh_io.*     # OBJ/STL file loading
-│   ├── mesh_repair.* # Watertightness check and hole filling
-│   ├── sdf_io.*      # SDF file I/O
-│   └── sdfgen_unified.* # Unified CPU/GPU API
+├── common/           # Shared code (unified API, mesh I/O, mesh repair, SDF I/O, grid sizing)
 ├── cpu_lib/          # Multi-threaded CPU implementation
 ├── gpu_lib/          # CUDA GPU implementation
-├── python/           # Python bindings (nanobind + NumPy)
-│   ├── sdfgen_py.cpp
-│   ├── __init__.py
-│   ├── tests/test_sdfgen.py    # 51 tests
-│   └── README.md               # Python API docs
-├── tests/            # C++ test suite
-├── tools/            # Build scripts (external submodule)
-├── sdf_to_mesh/      # SDF to mesh converter (marching cubes)
-├── BUILD.md          # Build instructions
-└── README.md         # This file
+├── python/           # Python bindings
+│   ├── sdfgen_py.cpp # nanobind extension source
+│   ├── sdfgen.py     # high-level Python API (installed as sdfgen/__init__.py)
+│   ├── tests/        # Python test suite (51 tests)
+│   └── README.md     # Python API docs
+├── sdf_to_mesh/      # SDF-to-mesh converter (marching cubes)
+├── tests/            # C++ test suite (15 suites)
+├── tools/            # Build scripts (git submodule)
+├── BUILD.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+└── README.md         # this file
 ```
 
 ## Contributing
 
-Ideas for future contributions:
+See [CONTRIBUTING.md](CONTRIBUTING.md). Ideas for future work:
+
 - Additional output formats (OpenVDB, NanoVDB)
 - GPU-accelerated mesh preprocessing
 - Distance field gradients
@@ -253,17 +240,19 @@ Ideas for future contributions:
 
 ## License and Citation
 
-**License:** MIT (see LICENSE file)
+**License:** MIT (see [LICENSE](LICENSE))
 
-**Original Author:** Christopher Batty
-**Fork Enhancements:** Brad Chamberlain (2025)
+**Original author:** Christopher Batty
+**Fork enhancements:** Brad Chamberlain (2025)
 
 If you use this software in academic work, please cite the original:
+
 ```
 Batty, C. (2015). SDFGen. https://github.com/christopherbatty/SDFGen
 ```
 
 And if you use the GPU-accelerated version:
+
 ```
 Chamberlain, B. (2025). SDFGenFast. https://github.com/meet-radek/SDFGenFast
 ```
@@ -274,153 +263,97 @@ Chamberlain, B. (2025). SDFGenFast. https://github.com/meet-radek/SDFGenFast
 
 ## Appendix A: Performance Benchmarks
 
-Comprehensive benchmarks showing multi-threading scaling and GPU acceleration.
+**Test system:** Intel Core i7-13700KF (8 P-cores + 8 E-cores, 24 threads), NVIDIA GeForce RTX 4090, 128 GB RAM, Windows 11, Visual Studio 2026, CUDA 13.3.
+**Measured:** 2026-08-31 with `benchmark_performance` (see below). The benchmark loads the 3:4:5 box test mesh and sizes each grid proportionally from Nx with padding 2.
 
-**Test System:**
-- CPU: Intel i9-13900K (24 cores / 32 threads)
-- GPU: NVIDIA RTX 4090 (24GB VRAM)
-- RAM: 64GB DDR5
-- OS: Windows 11
+### Full Results
 
-### Full Benchmark Results
+| Nx  | Grid            | Total Cells | CPU (1) | CPU (10) | CPU (20) | CPU (24) | GPU    |
+|-----|-----------------|-------------|---------|----------|----------|----------|--------|
+| 64  | 64 x 84 x 104   | 559,104     | 698 ms  | 169 ms   | 206 ms   | 261 ms   | 71 ms  |
+| 128 | 128 x 169 x 211 | 4,564,352   | 5688 ms | 1043 ms  | 1206 ms  | 1467 ms  | 386 ms |
+| 256 | 256 x 340 x 424 | 36,904,960  | 46.1 s  | 7.37 s   | 5.78 s   | 7.04 s   | 814 ms |
 
-| Grid Size | Total Cells | CPU (1 thread) | CPU (10 threads) | CPU (20 threads) | GPU      |
-|-----------|-------------|----------------|------------------|------------------|----------|
-| 64³       | 559K        | 738 ms         | 127 ms           | 93 ms            | 111 ms   |
-| 128³      | 4.6M        | 5.98 s         | 789 ms           | 748 ms           | 358 ms   |
-| 256³      | 36.9M       | 48.6 s         | 6.95 s           | 4.18 s           | 1.29 s   |
+### Multi-Threading
 
-### Multi-Threading Efficiency
+Speedup relative to 1 thread:
 
-**Speedup vs. 1 thread:**
+| Threads | Nx = 64 | Nx = 128 | Nx = 256 |
+|---------|---------|----------|----------|
+| 10      | 4.1x    | 5.5x     | 6.3x     |
+| 20      | 3.4x    | 4.7x     | 8.0x     |
+| 24      | 2.7x    | 3.9x     | 6.5x     |
 
-| Threads | 64³ Grid | 128³ Grid | 256³ Grid | Avg Efficiency |
-|---------|----------|-----------|-----------|----------------|
-| 10      | 5.8x     | 7.6x      | 7.0x      | 58-76%         |
-| 20      | 7.9x     | 8.0x      | 11.6x     | 40-58%         |
+On this CPU (8 performance cores plus 8 efficiency cores), 10 threads gave the best time at Nx = 64 and 128, and 20 threads at Nx = 256. Using all 24 threads was slower than 10 threads in every measured case.
 
-**Key insights:**
-- Multi-threading scales well up to 10 threads (58-76% efficiency)
-- Efficiency drops at 20 threads (40-58%) due to memory bandwidth saturation
-- Best CPU performance typically at 10-15 threads
+### GPU Speedup
 
-### GPU Acceleration
+| Nx  | GPU vs 1 thread | GPU vs best CPU time |
+|-----|-----------------|----------------------|
+| 64  | 9.9x            | 2.4x                 |
+| 128 | 14.7x           | 2.7x                 |
+| 256 | 56.6x           | 7.1x                 |
 
-**Speedup vs. single-threaded CPU:**
-
-| Grid Size | GPU Speedup |
-|-----------|-------------|
-| 64³       | 6.7x        |
-| 128³      | 16.7x       |
-| 256³      | 37.6x       |
-
-**Speedup vs. 20-thread CPU:**
-
-| Grid Size | GPU vs 20-thread |
-|-----------|------------------|
-| 64³       | 0.8x (slower)    |
-| 128³      | 2.1x             |
-| 256³      | 3.2x             |
-
-**Key insights:**
-- GPU advantage increases dramatically with grid size
-- Small grids (< 128³): Multi-threaded CPU competitive
-- Large grids (≥ 256³): GPU provides substantial speedup
-- Memory transfer overhead visible on small grids
+The GPU was the fastest backend at every measured size on this system, and its advantage grows with grid size.
 
 ### Recommendations
 
-**For maximum performance:**
+- Use the GPU when one is available. The automatic backend selection does this for you.
+- On the CPU, more threads is not always faster. Around 10 threads was the best general setting on this system; measure on yours.
 
-| Grid Size | Recommended Configuration |
-|-----------|--------------------------|
-| < 64³     | CPU with 10 threads      |
-| 64³-128³  | CPU with 10-20 threads   |
-| > 128³    | GPU (if available)       |
-
-**Thread Configuration:**
-- Default behavior: Auto-detects CPU core count
-- Manual override: Add thread count as last parameter
-- Examples:
-  ```bash
-  SDFGen mesh.obj 0.1 2 10    # Force 10 threads
-  SDFGen mesh.stl 128 1 0     # Auto-detect (default)
-  ```
-
-### Run Benchmarks Yourself
+Set the thread count with `-t` (default 0 = auto-detect):
 
 ```bash
-cd tests
-../build-Release/bin/benchmark_performance
+SDFGen mesh.obj 0.1 -t 10   # 10 threads
+SDFGen mesh.stl 128         # auto-detect
+```
+
+### Run the Benchmarks Yourself
+
+The benchmark executable is not built by default. Enable it, then run it:
+
+```bash
+cmake -B build-Release -DSDFGEN_BUILD_BENCHMARKS=ON
+cmake --build build-Release --target benchmark_performance
+./build-Release/bin/benchmark_performance
 ```
 
 ---
 
 ## Appendix B: Testing Guide
 
-SDFGen includes comprehensive test coverage for both C++ and Python components.
+### C++ Test Suites (15)
 
-### C++ Test Suite (15 tests)
+| Suite | Covers |
+|-------|--------|
+| `test_correctness` | CPU results on a known mesh; CPU/GPU agreement when a GPU is present |
+| `test_file_io` | SDF file read and write |
+| `test_stl_file_io`, `test_obj_file_io` | End-to-end STL and OBJ processing |
+| `test_ascii_stl` | ASCII STL parsing |
+| `test_mode1_legacy` | The original OBJ + dx mode |
+| `test_cli_modes`, `test_cli_formats`, `test_cli_backend`, `test_cli_output`, `test_cli_errors`, `test_cli_threads` | CLI integration: every usage mode, format handling, backend selection, output files, error handling, and thread flags |
+| `test_thread_slice_ratios` | Threading edge cases (more threads than slices, odd ratios) |
+| `test_vtk_output` | SDF write/read round-trip losslessness |
+| `test_mesh_repair` | Watertightness analysis and hole filling |
 
-**Test Categories:**
-
-1. **Correctness Tests (3)**
-   - `test_correctness` - Validates CPU implementation (and CPU/GPU agreement when GPU available)
-   - `test_file_io` - Tests SDF file read/write operations
-   - `test_mode1_legacy` - Validates legacy OBJ+dx mode
-
-2. **CLI Integration Tests (6)**
-   - `test_cli_modes` - All CLI usage modes
-   - `test_cli_backend` - Auto backend detection
-   - `test_cli_formats` - STL/OBJ format support
-   - `test_cli_output` - Output file generation
-   - `test_cli_errors` - Error handling
-   - `test_cli_threads` - Thread parameter handling
-
-3. **File Format Tests (3)**
-   - `test_stl_file_io` - Binary STL processing
-   - `test_obj_file_io` - OBJ file processing
-   - `test_ascii_stl` - ASCII STL support
-
-4. **Library Tests (1)**
-   - `test_mesh_repair` - Mesh watertightness analysis and repair API
-
-5. **Edge Case Tests (2)**
-   - `test_thread_slice_ratios` - Threading edge cases
-   - `test_vtk_output` - VTK format support (if compiled)
-
-**Running C++ Tests:**
+Run all suites with CTest:
 
 ```bash
-# Windows
-cd build-Release/bin
-test_correctness.exe
-test_file_io.exe
-test_cli_modes.exe
-# ... run each test (all should show ✓ PASSED)
-
-# Linux
-cd build-Release/bin
-./test_correctness
-./test_file_io
-./test_cli_modes
-# ... etc
+ctest --test-dir build-Release --output-on-failure
 ```
 
-**Expected output:**
-- Each test outputs `✓ PASSED` or `✓ ALL TESTS PASSED`
-- Zero failures expected on supported platforms
-
-**Note:** Tests must be run from the `build-Release/bin/` directory where test resources are located.
-
-**Note:** All tests work on CPU-only builds. GPU-specific tests (like `test_correctness` CPU/GPU comparison) automatically skip GPU validation when CUDA is not available or no GPU is detected.
+Tests locate their resources and the SDFGen binary through paths baked in at build time, so CTest can run from any directory. GPU comparisons skip automatically when CUDA is not built or no GPU is present.
 
 ### Python Test Suite (51 tests)
 
-**Test Coverage:**
+```bash
+pip install pytest
+pytest python/tests -v                                    # all tests
+pytest python/tests/test_sdfgen.py::TestBackends -v       # one class
+```
 
-| Test Class | Tests | Coverage |
-|------------|-------|----------|
+| Test class | Tests | Covers |
+|------------|-------|--------|
 | TestBasicFunctionality | 5 | Core API functions |
 | TestBackends | 4 | CPU/GPU backend selection |
 | TestParameters | 5 | Parameter variations |
@@ -431,102 +364,12 @@ cd build-Release/bin
 | TestDataValidation | 6 | Data type handling |
 | TestEdgeCases | 8 | Boundary conditions |
 
-**Running Python Tests:**
-
-```bash
-# Install pytest
-pip install pytest
-
-# Run all tests
-pytest python/tests/test_sdfgen.py -v
-
-# Run specific test class
-pytest python/tests/test_sdfgen.py::TestBackends -v
-
-# Run specific test
-pytest python/tests/test_sdfgen.py::TestBackends::test_cpu_backend -v
-```
-
-**Expected output:**
-```
-============================== 51 passed in 0.49s ==============================
-```
-
 ### Test Resources
 
-Test meshes located in `tests/resources/`:
-- Binary STL files
-- ASCII STL files
-- OBJ files (triangles and quads)
-- Reference SDF outputs
+Test meshes are in `tests/resources/`: binary STL, ASCII STL, OBJ (triangles and quads), and one reference SDF fixture.
 
 ### Writing New Tests
 
-**C++ tests:**
-- Add to `tests/` directory
-- Update `tests/CMakeLists.txt`
-- Use `test_utils` library for common functionality
+**C++:** add a `test_*.cpp` file in `tests/`, then add one line to the test table in `tests/CMakeLists.txt`. Use the helpers in `test_utils` (library tests) or `cli_test_utils` (CLI tests).
 
-**Python tests:**
-- Add to `python/tests/test_sdfgen.py`
-- Use pytest fixtures: `simple_cube`, `temp_obj_file`, `temp_sdf_file`
-- Follow existing test patterns
-
----
-
-## Appendix C: What's New in This Fork
-
-This enhanced version adds significant improvements over the [original SDFGen](https://github.com/christopherbatty/SDFGen).
-
-### Comparison Table
-
-| Feature | Original SDFGen | This Fork |
-|---------|----------------|-----------|
-| **Performance** | Single-threaded CPU | Multi-threaded CPU + GPU (CUDA) |
-| **Input Formats** | OBJ only | OBJ + Binary/ASCII STL |
-| **Grid Sizing** | Manual dx calculation | Auto-proportional + manual modes |
-| **Build System** | Basic Makefile | CMake 3.20+ with auto-detection |
-| **Platforms** | Linux/Mac | Windows + Linux with automated scripts |
-| **GPU Support** | None | Automatic detection and usage |
-| **Python API** | None | nanobind bindings with NumPy + GPU |
-| **Testing** | None | 15 C++ + 51 Python tests |
-| **Documentation** | Basic | Complete build guide + examples |
-| **Speed (256³)** | ~20 seconds | 1.29s GPU / 4.18s CPU (20 threads) |
-
-### Performance Enhancements
-
-- **Multi-threaded CPU**: Parallel implementation (6-10x faster than single-threaded)
-- **GPU Acceleration**: CUDA implementation with 1.1-5.4x additional speedup over multi-threaded CPU
-- **Automatic Backend Selection**: PyTorch-style automatic GPU detection (no manual flags)
-- **Fast Sweeping Algorithm**: Optimized GPU implementation of Eikonal solver
-
-### New Features
-
-- **Python Bindings**: High-performance nanobind API with NumPy integration and GPU support
-- **STL Support**: Binary and ASCII STL file formats (original only supported OBJ)
-- **Mesh Repair**: Automatic watertightness detection with optional hole-filling (`--fix`)
-- **Flexible Grid Modes**: Proportional dimension calculation for STL files
-- **Improved CLI**: Multiple usage modes with better parameter handling
-- **Thread Control**: Configurable CPU thread count for optimal performance
-- **Comprehensive Testing**: Full test coverage of all functionality
-
-### Build System Improvements
-
-- **Cross-Platform**: Automated build scripts for Windows (MSVC) and Linux (GCC/Clang)
-- **CMake 3.20+**: Modern CMake with automatic CUDA detection
-- **Professional Tooling**: Configuration scripts, test suite, and comprehensive documentation
-- **Auto-Detection**: Build-time CUDA detection, runtime GPU detection
-- **Better Errors**: Clear error messages with installation instructions
-
-### Developer Experience
-
-- **No Manual Configuration**: GPU detection happens automatically
-- **Clear Documentation**: Complete build guide, API docs, and usage examples
-- **Comprehensive Tests**: Validate correctness across all features and platforms
-- **Simple API**: Both CLI and Python API designed for ease of use
-
----
-
-**Version:** 2.2.0
-**Last Updated:** 2025-12-26
-**Tested On:** Windows 11, Ubuntu 22.04, Python 3.10-3.12, CUDA 12.4
+**Python:** add tests to `python/tests/test_sdfgen.py`. Use the existing fixtures (`simple_cube`, `temp_obj_file`, `temp_sdf_file`).

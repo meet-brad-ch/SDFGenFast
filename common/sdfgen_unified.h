@@ -42,7 +42,9 @@ enum class HardwareBackend {
  * @param num_threads CPU thread count, 0 = auto-detect (only used for CPU backend)
  *
  * @note When backend is Auto, GPU is tried first and falls back to CPU if unavailable
- * @note The exact_band parameter controls accuracy vs performance tradeoff
+ * @note A larger exact_band computes more cells exactly and takes more time.
+ *       Beyond the band, distances propagate by sweeping and may not be to the
+ *       closest triangle.
  */
 void make_level_set3(
     const std::vector<Vec3ui>& tri,

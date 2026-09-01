@@ -45,7 +45,7 @@ struct SDFComparisonResult {
     int32_t sign_mismatch_count = 0;      ///< Cells where CPU and GPU disagree on inside/outside
     float max_diff = 0.0f;                ///< Maximum absolute difference found
     float near_band_max_diff = 0.0f;      ///< Maximum difference within the near band
-    float tolerance = 0.0f;               ///< Cell spacing (dx) used as base tolerance
+    float tolerance = 0.0f;               ///< Base tolerance (half a cell, dx * 0.5)
 
     double cpu_time_ms = 0.0;             ///< CPU execution time in milliseconds
     double gpu_time_ms = 0.0;             ///< GPU execution time in milliseconds

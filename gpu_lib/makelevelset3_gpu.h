@@ -13,14 +13,14 @@ namespace gpu {
 /**
  * @brief Generate signed distance field using GPU-accelerated CUDA implementation
  *
- * Computes a 3D signed distance field from a triangle mesh using CUDA GPU acceleration.
- * The GPU implementation parallelizes across grid cells, with each CUDA thread processing
- * one or more cells. The algorithm mirrors the CPU version with two phases: (1) exact
- * distance computation for cells within exact_band of triangle surfaces, and (2) fast
- * sweeping for far-field distance propagation. The mesh should be closed and manifold
- * for accurate inside/outside determination; triangle soups will have correct absolute
- * distances but may have sign errors. This implementation typically achieves 10-40x
- * speedup over multi-threaded CPU for large grids.
+ * Computes a 3D signed distance field from a triangle mesh on a CUDA GPU.
+ * The kernel assigns grid cells to CUDA threads. The algorithm mirrors the
+ * CPU version and has two phases: exact distance computation for cells within
+ * exact_band of a triangle, then iterative sweeping to propagate distances to
+ * the far field. The mesh should be closed and manifold for correct
+ * inside/outside signs. A triangle soup gets correct absolute distances, but
+ * its signs can be wrong. Measured speedups over the CPU path are in
+ * README.md, Appendix A; the advantage grows with grid size.
  *
  * @param tri Triangle indices defining mesh topology, each Vec3ui contains 3 vertex indices
  * @param x Vertex positions in world coordinates
@@ -32,8 +32,12 @@ namespace gpu {
  * @param phi Output signed distance field array (will be resized to nx*ny*nz)
  * @param exact_band Width of exact computation band in grid cells (default: 1)
  *
- * @note Requires CUDA-capable GPU and CUDA runtime libraries
- * @note Results should be numerically identical or nearly identical to CPU version
+ * @note Requires a CUDA-capable GPU and the CUDA runtime; throws std::runtime_error on CUDA errors
+ * @note Agreement with the CPU path, as enforced by test_correctness: identical
+ *       inside/outside sign for every cell, and distances within dx/2 of the CPU
+ *       result for cells within 2 cells of the surface. Far-field cells can
+ *       differ more, because the two backends propagate distances in different
+ *       orders.
  * @note Distances within exact_band cells of triangles are computed exactly
  * @note Distances beyond exact_band may not be to the closest triangle
  */

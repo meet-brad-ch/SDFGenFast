@@ -1,83 +1,51 @@
 # Building SDFGenFast
 
-Complete build guide for the C++ library, CLI tool, and Python bindings.
+Build guide for the C++ library, CLI tool, and Python bindings.
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Building C++ Library and CLI](#building-c-library-and-cli)
-- [Building Python Bindings](#building-python-bindings)
+- [Cloning the Repository](#cloning-the-repository)
+- [Building the C++ Library and CLI](#building-the-c-library-and-cli)
+- [Building the Python Bindings](#building-the-python-bindings)
 - [Running Tests](#running-tests)
+- [Build Options](#build-options)
 - [Troubleshooting](#troubleshooting)
-- [Advanced Options](#advanced-options)
 
 ---
 
 ## Prerequisites
 
-### Required Software
+### Required
 
-| Component | Version | Windows | Linux |
-|-----------|---------|---------|-------|
-| **C++ Compiler** | C++17 | Visual Studio 2022 | GCC 9+ / Clang 10+ |
-| **CMake** | 3.20+ | ✓ | ✓ |
-| **Build System** | | Ninja (recommended) | Ninja / Make |
-| **Python** (optional) | 3.8+ | ✓ | ✓ |
-| **CUDA Toolkit** (optional) | 11.0+ | Auto-detected | Auto-detected |
+| Component | Requirement |
+|-----------|-------------|
+| C++ compiler | C++17: Visual Studio 2022 or 2026 (Windows), GCC 9+ or Clang 10+ (Linux) |
+| CMake | 3.23 or newer |
+| Build system | Ninja (recommended) or Make; Ninja ships with Visual Studio |
 
-### Windows Prerequisites
+### Optional
 
-**Visual Studio 2022:**
-- Download from https://visualstudio.microsoft.com/downloads/
-- Install "Desktop development with C++" workload
-- Ninja build system included with VS 2022
+| Component | Requirement |
+|-----------|-------------|
+| CUDA Toolkit (GPU support) | 12.x with Visual Studio 2022 or GCC; **13.x required for Visual Studio 2026** (see [Troubleshooting](#troubleshooting)) |
+| Python (bindings) | 3.8 or newer |
 
-**Verification:**
-```powershell
-cmake --version    # Should show 3.20+
-ninja --version    # Should show 1.10+
-```
-
-### Linux Prerequisites
+**Windows:** install the "Desktop development with C++" workload in the Visual Studio Installer.
 
 **Ubuntu/Debian:**
+
 ```bash
-sudo apt-get update
 sudo apt-get install build-essential cmake ninja-build git
 ```
 
-**Fedora/RHEL:**
-```bash
-sudo dnf groupinstall "Development Tools"
-sudo dnf install cmake ninja-build git
-```
-
-**Verification:**
-```bash
-cmake --version    # Should show 3.20+
-g++ --version      # Should show GCC 9+
-ninja --version    # Should show 1.10+
-```
-
-### Optional: GPU Acceleration
-
-**CUDA Toolkit** (automatically detected if installed):
-- Download from https://developer.nvidia.com/cuda-downloads
-- Follow platform-specific installer instructions
-- No manual configuration needed - CMake auto-detects CUDA
-
-**Verify CUDA:**
-```bash
-nvcc --version     # Should show CUDA 11.0+
-nvidia-smi         # Should show GPU info (Linux)
-```
+**CUDA Toolkit:** download from https://developer.nvidia.com/cuda-downloads. CMake detects it automatically; no configuration is needed. Verify with `nvcc --version`.
 
 ---
 
 ## Cloning the Repository
 
-This project uses git submodules. Clone with:
+The build scripts in `tools/` are a git submodule. Clone with:
 
 ```bash
 git clone --recurse-submodules https://github.com/meet-radek/SDFGenFast
@@ -91,429 +59,172 @@ git submodule update --init
 
 ---
 
-## Quick Start
+## Building the C++ Library and CLI
 
-### Windows
-```powershell
-# Navigate to tools directory
-cd tools
+### Option A: Plain CMake (any platform)
 
-# Configure build
-./configure.bat Release
+Run from a shell where your compiler is available (on Windows: a "Developer Command Prompt" or a shell after `vcvarsall.bat x64`):
 
-# Build everything
-./build.bat all Release
-
-# Executables created in build-Release/bin/
+```bash
+cmake -B build-Release -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build-Release
 ```
 
-### Linux
-```bash
-# Navigate to tools directory
+The build type defaults to `Release` when you omit `-DCMAKE_BUILD_TYPE`.
+
+### Option B: Wrapper scripts
+
+The `tools/` submodule provides scripts that locate Visual Studio (2026 or 2022) and set up the environment for you:
+
+```
+# Windows - run from cmd.exe or PowerShell, not from Git Bash
 cd tools
+configure.bat Release
+build.bat all Release
+```
 
-# Make scripts executable
-chmod +x configure.sh build.sh
-
-# Configure build
+```bash
+# Linux
+cd tools
 ./configure.sh Release
-
-# Build everything
-./build.sh all
-
-# Executables created in build-Release/bin/
-```
-
----
-
-## Building C++ Library and CLI
-
-### Step 1: Configure the Build
-
-The configuration phase generates build files and detects CUDA.
-
-**Windows:**
-```powershell
-cd tools
-./configure.bat Release
-```
-
-**Linux:**
-```bash
-cd tools
-chmod +x configure.sh
-./configure.sh Release
-```
-
-**What it does:**
-- Detects Visual Studio (Windows) or GCC/Clang (Linux)
-- Searches for CUDA Toolkit (auto-detected)
-- Generates build files in `build-Release/`
-- Creates Ninja or Make build scripts
-
-**Output:**
-- Creates `build-Release/` directory
-- Displays detected compilers and CUDA status
-- Reports whether GPU support will be compiled
-
-### Step 2: Build
-
-**Windows:**
-```powershell
-cd tools
-./build.bat all Release
-```
-
-**Linux:**
-```bash
-cd tools
 ./build.sh all
 ```
 
-**Optional: Build specific targets:**
-```bash
-# Windows
-./build.bat SDFGen Release      # CLI only
-./build.bat test_correctness    # Specific test
+**Windows note:** run the `.bat` scripts from a real `cmd.exe` or PowerShell window. Git Bash invokes them through a bridge that breaks their internal path resolution.
 
-# Linux
-./build.sh SDFGen                       # CLI only
-./build.sh test_correctness             # Specific test
-```
+### Output
 
-**Output:**
-- `build-Release/bin/SDFGen.exe` (or `SDFGen` on Linux) - CLI tool
-- `build-Release/lib/` - Static libraries
-- `build-Release/bin/test_*.exe` - Test executables
+- `build-Release/bin/SDFGen` (`.exe` on Windows) - the CLI tool
+- `build-Release/bin/sdf_to_mesh` - the SDF-to-mesh converter
+- `build-Release/bin/test_*` - test executables
+- `build-Release/lib/` - static libraries
 
-### Step 3: Verify Build
-
-**Run the CLI:**
-```bash
-# Windows
-cd build-Release/bin
-./SDFGen.exe mesh.stl 128
-
-# Linux
-cd build-Release/bin
-./SDFGen mesh.stl 128
-```
+During configuration, CMake reports whether CUDA was found and whether GPU support will be compiled.
 
 ---
 
-## Building Python Bindings
+## Building the Python Bindings
 
-### Prerequisites
-
-**Python packages:**
-```bash
-pip install numpy nanobind
-```
-
-### Method 1: pip install (Recommended)
+### Method 1: pip install (recommended)
 
 ```bash
-# From project root
 pip install .
-
-# Or for development (editable install)
-pip install -e .
 ```
 
-This automatically:
-- Runs CMake configuration
-- Builds the C++ extension
-- Installs the `sdfgen` package
+This builds the C++ extension and installs the `sdfgen` package. The build dependencies (scikit-build-core, nanobind) are downloaded automatically; the installed package depends on NumPy. On Windows with CUDA, the CUDA runtime DLL is bundled into the package.
 
-### Method 2: Manual Build
+### Method 2: In-tree CMake build
 
-**Windows:**
-```powershell
-# 1. Configure CMake (if not done already)
-cd tools
-./configure.bat Release
-
-# 2. Enable Python bindings
-cd ../build-Release
-cmake -DBUILD_PYTHON_BINDINGS=ON -DPython_EXECUTABLE="C:/Python310/python.exe" .
-
-# 3. Build Python extension
-cd ../tools
-./build.bat sdfgen_ext Release
-```
-
-**Linux:**
 ```bash
-# 1. Configure CMake (if not done already)
-cd tools
-./configure.sh Release
-
-# 2. Enable Python bindings
-cd ../build-Release
-cmake -DBUILD_PYTHON_BINDINGS=ON .
-
-# 3. Build Python extension
-cd ../tools
-./build.sh sdfgen_ext
+cmake -B build-Release -DCMAKE_BUILD_TYPE=Release -DBUILD_PYTHON_BINDINGS=ON -DPython_EXECUTABLE=/path/to/python
+cmake --build build-Release
 ```
 
-**Output:**
-- Windows: `build-Release/lib/sdfgen_ext.cp310-win_amd64.pyd`
-- Linux: `build-Release/lib/sdfgen_ext.cpython-310-x86_64-linux-gnu.so`
+This builds the extension and assembles an importable package in `sdfgen/` at the project root (used by the test suite; it is not an installed package).
 
-### Verify Python Build
+### Verify
 
-```python
+```bash
 python -c "import sdfgen; print(sdfgen.__version__)"
 python -c "import sdfgen; print('GPU:', sdfgen.is_gpu_available())"
 ```
 
-**See `python/README.md` for detailed API documentation and usage examples.**
+See [python/README.md](python/README.md) for the API documentation.
 
 ---
 
 ## Running Tests
 
-### C++ Tests
+### C++ (15 suites)
 
-**Run tests from build directory:**
 ```bash
-# Windows
-cd build-Release/bin
-test_correctness.exe
-test_file_io.exe
-test_stl_file_io.exe
-test_obj_file_io.exe
-test_ascii_stl.exe
-test_mode1_legacy.exe
-test_thread_slice_ratios.exe
-test_cli_modes.exe
-test_cli_formats.exe
-test_cli_backend.exe
-test_cli_output.exe
-test_cli_errors.exe
-test_cli_threads.exe
-
-# Linux
-cd build-Release/bin
-./test_correctness
-./test_file_io
-# ... etc
+ctest --test-dir build-Release --output-on-failure
 ```
 
-**All tests should output `✓ PASSED` or `✓ ALL TESTS PASSED`**
+Tests locate their resources and the SDFGen binary through paths baked in at build time, so CTest can run from any directory. GPU comparisons skip automatically when CUDA is not built or no GPU is present at run time. You can also run a single test executable directly from `build-Release/bin/`.
 
-**Note:** Tests must be run from the `build-Release/bin/` directory where test resources are located.
-
-**Note:** Tests work on CPU-only builds. GPU-specific tests automatically skip GPU validation when CUDA is not built or GPU is not available at runtime.
-**Note:** Tests can be run from any directory - resource files are automatically located.
-
-**Alternative: Run all tests via CTest:**
-```bash
-cd build-Release
-ctest --output-on-failure
-```
-This runs all 14 tests and shows detailed output only for failures.
-
-### Python Tests
+### Python (51 tests)
 
 ```bash
-# Install pytest if needed
 pip install pytest
-
-# Run Python test suite (from project root)
-pytest python/tests/test_sdfgen.py -v
-
-# Should show: "51 passed in X.XXs"
+pytest python/tests -q
 ```
+
+---
+
+## Build Options
+
+Pass these to the `cmake -B` configure step.
+
+| Option | Default | Effect |
+|--------|---------|--------|
+| `-DSDFGEN_BUILD_GPU=OFF` | `ON` | Build without CUDA, even when a toolkit is installed |
+| `-DBUILD_PYTHON_BINDINGS=ON` | `OFF` | Build the Python extension |
+| `-DBUILD_TESTING=OFF` | `ON` | Skip building the test suite |
+| `-DSDFGEN_BUILD_BENCHMARKS=ON` | `OFF` | Build the `benchmark_performance` executable |
+| `-DSDFGEN_WARNINGS_AS_ERRORS=ON` | `OFF` | Treat compiler warnings as errors |
+| `-DSDFGEN_CUDA_ARCHITECTURES=...` | `all-major` | CUDA architectures to compile for, e.g. `"80;89"` |
+| `-DPython_EXECUTABLE=...` | auto | Python interpreter for the bindings |
+| `-DCMAKE_BUILD_TYPE=Debug` | `Release` | Debug build with symbols and assertions |
+
+Common CUDA architecture values: `75` Turing (RTX 20xx), `80` Ampere (RTX 30xx), `89` Ada Lovelace (RTX 40xx). The default `all-major` covers all major architectures the installed CUDA toolkit supports.
 
 ---
 
 ## Troubleshooting
 
-### Common Issues (All Platforms)
+### Visual Studio 2026 requires CUDA 13
 
-**CMake not found:**
+CUDA 12.x cannot compile this project with the Visual Studio 2026 standard-library headers: `cudafe++` crashes while parsing them. Install CUDA 13.x for VS 2026. With VS 2022, CUDA 12.x works.
+
+If CMake picks up the wrong CUDA installation, point it at the right one:
+
 ```bash
-# Windows: Install Visual Studio 2022 with CMake component
-# Linux: sudo apt-get install cmake
+cmake -B build-Release -DCUDAToolkit_ROOT="C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3" -DCMAKE_CUDA_COMPILER="C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/bin/nvcc.exe"
 ```
 
-**CUDA not detected (when GPU is available):**
+### CUDA not detected
+
 ```bash
-# Verify CUDA is in PATH
-nvcc --version
-
-# Windows: Add CUDA to PATH
-# set PATH=%PATH%;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin
-
-# Linux: Add to ~/.bashrc
-# export PATH=/usr/local/cuda/bin:$PATH
-# export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+nvcc --version       # is the toolkit on PATH?
+nvidia-smi           # is the driver installed? (also shows the GPU)
 ```
 
-**Build fails with "No such file or directory":**
-- Ensure you're in the `tools/` directory when running build scripts
-- Scripts expect `CMakeLists.txt` in parent directory
+On Windows, add the CUDA `bin` directory to `PATH`. On Linux, add to `~/.bashrc`:
 
-### Windows-Specific Issues
-
-**Visual Studio not found:**
-- Verify installation: `ls "C:\Program Files\Microsoft Visual Studio\2022\Community"`
-- Ensure "Desktop development with C++" workload is installed
-- Run scripts from VS Developer Command Prompt if auto-detection fails
-
-**Python extension import fails (DLL not found):**
-```powershell
-# Copy CUDA runtime DLL to package directory
-copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4\bin\cudart64_12.dll" sdfgen\
-```
-
-### Linux-Specific Issues
-
-**Permission denied on scripts:**
 ```bash
-chmod +x tools/configure.sh tools/build.sh
-```
-
-**GPU not detected at runtime:**
-```bash
-# Check NVIDIA driver
-nvidia-smi
-
-# Check CUDA libraries
-ldd build-Release/bin/SDFGen | grep cuda
-```
-
-**Python import error (undefined symbol):**
-```bash
+export PATH=/usr/local/cuda/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-# Add to ~/.bashrc to make permanent
 ```
 
-### Slow Builds
+### Python extension import fails
 
-**Use Ninja instead of Make (Linux):**
-```bash
-sudo apt-get install ninja-build
-./configure.sh Release  # Auto-detects Ninja
-```
+- **Windows, `DLL load failed`:** the package needs the CUDA runtime DLL (`cudart64_12.dll` or `cudart64_13.dll`). `pip install .` bundles it; for other setups, add the CUDA `bin` directory (CUDA 13: `bin\x64`) to `PATH`.
+- **Linux, `undefined symbol`:** export `LD_LIBRARY_PATH` as shown above.
+- **`ModuleNotFoundError: No module named 'sdfgen'`:** run `pip install .` from the project root.
 
-**Use parallel builds:**
-```bash
-# Windows: Already enabled (24 parallel jobs by default)
-# Linux: ./build.sh uses all CPU cores automatically
-```
+### Visual Studio not found by the wrapper scripts
 
-**Exclude build directory from antivirus (Windows):**
-- Scanning build artifacts significantly slows compilation
-- Add `build-Release/` to Windows Defender exclusions
+- Ensure the "Desktop development with C++" workload is installed.
+- Run the scripts from a real `cmd.exe` or PowerShell window, not from Git Bash.
+- If detection still fails, use plain CMake from a Developer Command Prompt (Option A above).
 
----
+### Slow builds on Windows
 
-## Advanced Options
+Add `build-Release/` to your antivirus exclusions; scanning build artifacts slows compilation considerably.
 
-### Custom Python Installation
+### Clean rebuild
 
 ```bash
-cmake -DBUILD_PYTHON_BINDINGS=ON \
-      -DPython_EXECUTABLE=/path/to/python3.10 \
-      ..
-```
-
-### Specify CUDA Architecture
-
-```bash
-cmake -DCMAKE_CUDA_ARCHITECTURES="75;80;89" ..
-```
-
-Common architectures:
-- `75` - Turing (RTX 20xx, GTX 16xx)
-- `80` - Ampere (RTX 30xx)
-- `89` - Ada Lovelace (RTX 40xx)
-
-### Force CPU-Only Build
-
-```bash
-cmake -DSDFGEN_BUILD_GPU=OFF ..
-```
-
-### Debug Build
-
-```bash
-# Windows
-./configure.bat Debug
-./build.bat all Debug
-
-# Linux
-./configure.sh Debug
-./build.sh all Debug
-```
-
-Creates `build-Debug/` with debug symbols and assertions enabled.
-
-### Clean Rebuild
-
-```bash
-# Option 1: Clean target
-./build.bat clean  # Windows
-./build.sh clean           # Linux
-
-# Option 2: Delete build directory
 rm -rf build-Release
-./configure.bat Release  # Reconfigure from scratch
+cmake -B build-Release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-Release
 ```
 
 ---
 
-## File Locations
+## Verified Configurations
 
-After building, your project structure will be:
-
-```
-SDFGenFast/
-├── build-Release/
-│   ├── bin/
-│   │   ├── SDFGen.exe              # CLI tool
-│   │   └── test_*.exe              # Test executables
-│   └── lib/
-│       ├── sdfgen_ext.*.pyd/.so    # Python extension (if built)
-│       ├── sdfgen_common.lib       # Static libraries
-│       ├── sdfgen_cpu.lib
-│       └── sdfgen_gpu.lib
-├── sdfgen/                         # Python package (if installed)
-│   ├── __init__.py
-│   └── sdfgen_ext.*.pyd/.so
-└── tools/                          # Build scripts
-    ├── configure.bat / configure.sh
-    └── build.bat / build.sh
-```
-
----
-
-## Next Steps
-
-- **Usage Guide:** See [README.md](README.md) for CLI and Python usage examples
-- **Python API:** See [python/README.md](python/README.md) for detailed API documentation
-- **Test Details:** See README.md Appendix B for test suite information
-- **Performance Data:** See README.md Appendix A for benchmarks
-
----
-
-## Support
-
-**For build issues:**
-1. Check this troubleshooting section above
-2. Verify prerequisites are correctly installed
-3. Try a clean rebuild (delete `build-Release/` and reconfigure)
-4. Check CMake output for specific error messages
-
-**For runtime issues:**
-1. Verify GPU availability with `nvidia-smi` (if using GPU)
-2. Check Python version compatibility (3.8+)
-3. Run test suite to validate installation
-
----
-
-**Last Updated:** 2025-11-07
-**Tested Platforms:** Windows 11, Ubuntu 22.04 (CPU-only and CUDA 12.4 tested), Python 3.10-3.12
+- **Windows 11, Visual Studio 2026 Community, CUDA 13.3.1, Python 3.10** - verified 2026-08-31: full build, 15/15 C++ suites, 51/51 Python tests, GPU enabled (RTX 4090).
+- **Windows 11, Visual Studio 2022, CUDA 12.4** - used for earlier releases of this fork.
+- **Ubuntu 22.04, GCC** - used for earlier releases of this fork; the current revision has not been re-verified on Linux.
