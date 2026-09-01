@@ -55,7 +55,12 @@ bool load_obj(const char* filename,
             continue;
         }
 
-        // Parse line based on first character(s)
+        // Parse line based on first character(s). One-character lines
+        // carry no data; count them with the other ignored lines.
+        if (line.size() < 2) {
+            ++ignored_lines;
+            continue;
+        }
         if (line[0] == 'v') {
             if (line.size() >= 2 && line[1] == 'n') {
                 // Vertex normal - skip (not needed for SDF generation)
@@ -101,12 +106,37 @@ bool load_obj(const char* filename,
                                    ? vertex_str.substr(0, first_slash)
                                    : vertex_str;
 
-                int32_t v_idx = std::stoi(v_str);
+                int32_t v_idx = 0;
+                try {
+                    v_idx = std::stoi(v_str);
+                } catch (const std::exception&) {
+                    std::cerr << "WARNING: Bad vertex index '" << v_str
+                              << "' in face: " << line << std::endl;
+                    vertices.clear();
+                    break;
+                }
                 vertices.push_back(v_idx);
             }
 
             if (vertices.size() < 3) {
                 std::cerr << "WARNING: Face has < 3 vertices: " << line << std::endl;
+                continue;
+            }
+
+            // Indices must reference loaded vertices. Negative (relative)
+            // OBJ indexing is not supported by this loader; without this
+            // check an out-of-range index becomes a huge uint32_t and
+            // later causes a heap overread in the SDF computation.
+            bool indices_valid = true;
+            for (int32_t v_idx : vertices) {
+                if (v_idx < 1 || (size_t)v_idx > vertList.size()) {
+                    std::cerr << "WARNING: Vertex index " << v_idx
+                              << " out of range in face: " << line << std::endl;
+                    indices_valid = false;
+                    break;
+                }
+            }
+            if (!indices_valid) {
                 continue;
             }
 

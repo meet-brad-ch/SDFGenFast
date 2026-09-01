@@ -119,6 +119,21 @@ static bool load_binary_stl(const char* filename,
         return false;
     }
 
+    // Validate the declared count against the real file size before
+    // reserving memory: a corrupt count would request a huge allocation.
+    file.seekg(0, std::ios::end);
+    const int64_t actual_size = static_cast<int64_t>(file.tellg());
+    const int64_t expected_size = STL_HEADER_SIZE + 4 +
+        static_cast<int64_t>(num_triangles) * STL_TRIANGLE_SIZE;
+    if (actual_size < expected_size) {
+        std::cerr << "ERROR: Binary STL declares " << num_triangles
+                  << " triangles but the file is too small ("
+                  << actual_size << " bytes, expected at least "
+                  << expected_size << ")" << std::endl;
+        return false;
+    }
+    file.seekg(STL_HEADER_SIZE + 4, std::ios::beg);
+
     std::cout << "Reading binary STL with " << num_triangles << " triangles..." << std::endl;
 
     // Clear and reserve space

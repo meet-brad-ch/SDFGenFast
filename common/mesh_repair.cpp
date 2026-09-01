@@ -6,6 +6,7 @@
 #include "mesh_repair.h"
 #include <iostream>
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <tuple>
 
@@ -27,16 +28,6 @@ struct DetailedAnalysis {
     std::map<Edge, std::vector<int>> edge_triangles;
     std::vector<std::vector<unsigned int>> boundary_loops;
 };
-
-static Vec3f cross(const Vec3f& a, const Vec3f& b) {
-    return Vec3f(a[1]*b[2] - a[2]*b[1],
-                 a[2]*b[0] - a[0]*b[2],
-                 a[0]*b[1] - a[1]*b[0]);
-}
-
-static float length(const Vec3f& v) {
-    return std::sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-}
 
 // The vertex list is unused: the analysis is purely topological
 // (edge/face connectivity only).
@@ -163,7 +154,7 @@ static std::vector<Vec3ui> triangulate_hole(const std::vector<unsigned int>& loo
             Vec3f edge2(v2[0]-v1[0], v2[1]-v1[1], v2[2]-v1[2]);
             Vec3f normal = cross(edge1, edge2);
 
-            if (length(normal) < 1e-10f) continue;  // Degenerate
+            if (mag(normal) < 1e-10f) continue;  // Degenerate
 
             // Simple ear - just take it
             result.push_back(Vec3ui(remaining[prev], remaining[i], remaining[next]));
@@ -173,7 +164,9 @@ static std::vector<Vec3ui> triangulate_hole(const std::vector<unsigned int>& loo
         }
 
         if (!ear_found) {
-            // Fallback: just take first three vertices
+            // Every candidate ear was degenerate. Force-clip the ear at
+            // index 1 (same operation as the loop above) so triangulation
+            // always makes progress and terminates.
             result.push_back(Vec3ui(remaining[0], remaining[1], remaining[2]));
             remaining.erase(remaining.begin() + 1);
         }
@@ -219,7 +212,7 @@ int weld_vertices(std::vector<Vec3f>& vertices,
                             Vec3f diff(new_vertices[idx][0] - v[0],
                                        new_vertices[idx][1] - v[1],
                                        new_vertices[idx][2] - v[2]);
-                            if (length(diff) < tolerance) {
+                            if (mag(diff) < tolerance) {
                                 found_idx = idx;
                                 break;
                             }
@@ -285,10 +278,14 @@ int repair_mesh(std::vector<Vec3f>& vertices,
         std::cerr << "  WARNING: Mesh has non-manifold edges, repair may not succeed\n";
     }
 
-    // Fill holes
+    // Fill holes. Count only loops that actually produced triangles;
+    // triangulate_hole returns an empty list for degenerate loops.
     int holes_filled = 0;
     for (const auto& loop : analysis.boundary_loops) {
         std::vector<Vec3ui> new_tris = triangulate_hole(loop, vertices);
+        if (new_tris.empty()) {
+            continue;
+        }
         for (const auto& tri : new_tris) {
             faces.push_back(tri);
         }

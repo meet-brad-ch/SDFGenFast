@@ -9,13 +9,18 @@
 #include <cmath>
 #include <cfloat>
 #include <cstddef>
+#include <stdexcept>
+#include <string>
 
-// CUDA error checking macro
+// CUDA error checking macro. Throws instead of exiting: this code runs
+// inside host applications (including the Python extension), which must be
+// able to catch the error or fall back to the CPU implementation.
 #define CUDA_CHECK(err) { \
-    if (err != cudaSuccess) { \
-        std::cerr << "CUDA Error: " << cudaGetErrorString(err) \
-                  << " in " << __FILE__ << " at line " << __LINE__ << std::endl; \
-        exit(EXIT_FAILURE); \
+    cudaError_t cuda_check_status_ = (err); \
+    if (cuda_check_status_ != cudaSuccess) { \
+        throw std::runtime_error(std::string("CUDA error: ") \
+            + cudaGetErrorString(cuda_check_status_) \
+            + " in " + __FILE__ + " at line " + std::to_string(__LINE__)); \
     } \
 }
 
@@ -599,6 +604,24 @@ __global__ void sign_correction_kernel(float* phi, const int* intersection_count
 // Host Orchestrator
 // ============================================================================
 
+namespace {
+/// RAII owner for a device allocation. Frees on scope exit, so the
+/// throwing CUDA_CHECK cannot leak device memory.
+template <typename T>
+class DeviceBuffer {
+public:
+    explicit DeviceBuffer(size_t count) {
+        CUDA_CHECK(cudaMalloc(&ptr_, count * sizeof(T)));
+    }
+    ~DeviceBuffer() { cudaFree(ptr_); }
+    DeviceBuffer(const DeviceBuffer&) = delete;
+    DeviceBuffer& operator=(const DeviceBuffer&) = delete;
+    T* get() const { return ptr_; }
+private:
+    T* ptr_ = nullptr;
+};
+} // namespace
+
 void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x,
                      const Vec3f &origin, float dx, int ni, int nj, int nk,
                      Array3f &phi, const int exact_band)
@@ -607,20 +630,19 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
     const size_t num_triangles = tri.size();
     const size_t num_vertices = x.size();
 
-    // Allocate device memory
-    Vec3ui* d_tri;
-    Vec3f* d_x;
-    DistTriPair* d_dist_tri;
-    int* d_intersection_count;
-    float* d_phi_read;
-    float* d_phi_write;
-
-    CUDA_CHECK(cudaMalloc(&d_tri, num_triangles * sizeof(Vec3ui)));
-    CUDA_CHECK(cudaMalloc(&d_x, num_vertices * sizeof(Vec3f)));
-    CUDA_CHECK(cudaMalloc(&d_dist_tri, num_grid_cells * sizeof(DistTriPair)));
-    CUDA_CHECK(cudaMalloc(&d_intersection_count, num_grid_cells * sizeof(int)));
-    CUDA_CHECK(cudaMalloc(&d_phi_read, num_grid_cells * sizeof(float)));
-    CUDA_CHECK(cudaMalloc(&d_phi_write, num_grid_cells * sizeof(float)));
+    // Allocate device memory (RAII: freed on scope exit, throw-safe)
+    DeviceBuffer<Vec3ui> tri_buf(num_triangles);
+    DeviceBuffer<Vec3f> x_buf(num_vertices);
+    DeviceBuffer<DistTriPair> dist_tri_buf(num_grid_cells);
+    DeviceBuffer<int> intersection_count_buf(num_grid_cells);
+    DeviceBuffer<float> phi_read_buf(num_grid_cells);
+    DeviceBuffer<float> phi_write_buf(num_grid_cells);
+    Vec3ui* d_tri = tri_buf.get();
+    Vec3f* d_x = x_buf.get();
+    DistTriPair* d_dist_tri = dist_tri_buf.get();
+    int* d_intersection_count = intersection_count_buf.get();
+    float* d_phi_read = phi_read_buf.get();
+    float* d_phi_write = phi_write_buf.get();
 
     // Host to device copy
     CUDA_CHECK(cudaMemcpy(d_tri, tri.data(), num_triangles * sizeof(Vec3ui), cudaMemcpyHostToDevice));
@@ -635,7 +657,7 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
 
     // Kernel 2: Near-band distances
     int blockNear = 256;
-    int gridNear = (num_triangles + 255) / 256;
+    int gridNear = (int)((num_triangles + 255) / 256);
     near_band_distance_kernel<<<gridNear, blockNear>>>(d_tri, d_x, d_dist_tri, d_intersection_count,
                                                        num_triangles, origin, dx, ni, nj, nk, exact_band);
     CUDA_CHECK(cudaGetLastError());
@@ -675,14 +697,7 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
     float* phi_data = &phi.a[0];
     CUDA_CHECK(cudaMemcpy(phi_data, d_phi_read, num_grid_cells * sizeof(float), cudaMemcpyDeviceToHost));
 
-    // Cleanup
-    CUDA_CHECK(cudaFree(d_tri));
-    CUDA_CHECK(cudaFree(d_x));
-    CUDA_CHECK(cudaFree(d_dist_tri));
-    CUDA_CHECK(cudaFree(d_intersection_count));
-    CUDA_CHECK(cudaFree(d_phi_read));
-    CUDA_CHECK(cudaFree(d_phi_write));
-
+    // Device buffers are freed by the DeviceBuffer destructors.
 }
 
 } // namespace gpu
