@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cpp:
+    name: C++ (${{ matrix.os }}, CPU-only)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSDFGEN_BUILD_GPU=OFF
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  python:
+    name: Python (${{ matrix.os }}, CPU-only)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install package
+        run: pip install . -v
+
+      - name: Test
+        run: |
+          pip install pytest
+          pytest python/tests -q
+
+  cuda-build:
+    name: CUDA (ubuntu, compile only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Compile-only: the runner has no GPU, so this job validates that the
+      # CUDA code still builds. The cpp job runs the tests.
+      - name: Install CUDA toolkit (nvcc + cudart)
+        run: |
+          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update
+          sudo apt-get install -y cuda-nvcc-13-0 cuda-cudart-dev-13-0
+
+      - name: Configure
+        run: >
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          -DCUDAToolkit_ROOT=/usr/local/cuda-13.0
+          -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.0/bin/nvcc
+
+      - name: Verify GPU support was enabled
+        run: grep -q "SDFGEN_BUILD_GPU:BOOL=ON" build/CMakeCache.txt
+
+      - name: Build
+        run: cmake --build build
