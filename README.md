@@ -253,7 +253,7 @@ Ideas for future contributions:
 
 ## License and Citation
 
-**License:** BSD 3-Clause (see LICENSE file)
+**License:** MIT (see LICENSE file)
 
 **Original Author:** Christopher Batty
 **Fork Enhancements:** Brad Chamberlain (2025)
@@ -265,7 +265,7 @@ Batty, C. (2015). SDFGen. https://github.com/christopherbatty/SDFGen
 
 And if you use the GPU-accelerated version:
 ```
-Chamberlain, B. (2025). SDFGenFast. https://github.com/yourusername/SDFGenFast
+Chamberlain, B. (2025). SDFGenFast. https://github.com/meet-radek/SDFGenFast
 ```
 
 ---

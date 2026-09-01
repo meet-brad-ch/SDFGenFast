@@ -80,7 +80,7 @@ nvidia-smi         # Should show GPU info (Linux)
 This project uses git submodules. Clone with:
 
 ```bash
-git clone --recurse-submodules https://github.com/meet-brad-ch/SDFGenFast
+git clone --recurse-submodules https://github.com/meet-radek/SDFGenFast
 ```
 
 If you already cloned without submodules:

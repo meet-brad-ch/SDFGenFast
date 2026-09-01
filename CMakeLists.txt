@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(SDFGen VERSION 2.0 LANGUAGES CXX)
+project(SDFGen VERSION 2.2.0 LANGUAGES CXX)
 
 # ============================================================================
 # Fetch CLI11 for command-line parsing

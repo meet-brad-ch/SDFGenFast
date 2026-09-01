@@ -101,31 +101,6 @@ static void check_neighbour(const std::vector<Vec3ui> &tri, const std::vector<Ve
    }
 }
 
-static void sweep(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x,
-                  Array3f &phi, Array3i &closest_tri, const Vec3f &origin, float dx,
-                  int di, int dj, int dk)
-{
-   int i0, i1;
-   if(di>0){ i0=1; i1=phi.ni; }
-   else{ i0=phi.ni-2; i1=-1; }
-   int j0, j1;
-   if(dj>0){ j0=1; j1=phi.nj; }
-   else{ j0=phi.nj-2; j1=-1; }
-   int k0, k1;
-   if(dk>0){ k0=1; k1=phi.nk; }
-   else{ k0=phi.nk-2; k1=-1; }
-   for(int k=k0; k!=k1; k+=dk) for(int j=j0; j!=j1; j+=dj) for(int i=i0; i!=i1; i+=di){
-      Vec3f gx(i*dx+origin[0], j*dx+origin[1], k*dx+origin[2]);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j,    k);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j-dj, k);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j-dj, k);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j,    k-dk);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j,    k-dk);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j-dj, k-dk);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j-dj, k-dk);
-   }
-}
-
 // Threaded sweep - process a range of k slices
 static void sweep_range(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x,
                         Array3f &phi, Array3i &closest_tri, const Vec3f &origin, float dx,

@@ -90,8 +90,6 @@ nb::ndarray<nb::numpy, float> array3f_to_numpy(const Array3f& arr) {
         delete[] static_cast<float*>(p);
     });
 
-    size_t shape[3] = {ni, nj, nk};
-
     return nb::ndarray<nb::numpy, float>(
         data, {ni, nj, nk}, owner
     );
@@ -256,14 +254,6 @@ void save_sdf(
         nb::cast<float>(origin[2])
     );
 
-    // Compute bounds
-    Vec3f max_box(
-        origin_vec[0] + dx * nx,
-        origin_vec[1] + dx * ny,
-        origin_vec[2] + dx * nz
-    );
-
-    // Compute dx from the metadata
     // Save using existing I/O function
     bool success = write_sdf_binary(
         filename,

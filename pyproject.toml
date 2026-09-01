@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "sdfgen"
-version = "1.0.0"
+version = "2.2.0"
 description = "GPU-accelerated signed distance field generation from triangle meshes"
 readme = "README.md"
 license = {text = "MIT"}
@@ -33,9 +33,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/SDFGenFast"
-Repository = "https://github.com/yourusername/SDFGenFast"
-Issues = "https://github.com/yourusername/SDFGenFast/issues"
+Homepage = "https://github.com/meet-radek/SDFGenFast"
+Repository = "https://github.com/meet-radek/SDFGenFast"
+Issues = "https://github.com/meet-radek/SDFGenFast/issues"
 
 [project.optional-dependencies]
 test = [

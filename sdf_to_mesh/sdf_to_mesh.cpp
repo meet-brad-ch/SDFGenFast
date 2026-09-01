@@ -6,7 +6,6 @@
 #include <fstream>
 #include <vector>
 #include <cmath>
-#include <cstring>
 
 struct Vec3f {
     float x, y, z;

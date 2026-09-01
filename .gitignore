@@ -7,7 +7,7 @@ CMakeCache.txt
 cmake_install.cmake
 CTestTestfile.cmake
 Makefile
-*.cmake
+# NOTE: do not ignore *.cmake wholesale; helper modules may live in cmake/
 !CMakeLists.txt
 
 # Build output directories
@@ -48,7 +48,6 @@ config.h
 
 ## CLion
 .idea/
-cmake-build-*/
 
 ## Visual Studio
 .vs/
@@ -115,24 +114,21 @@ $RECYCLE.BIN/
 *.bak
 *.swp
 *.swo
-*~
 *.orig
 
 # Test output files
-*.sdf
 *.vti
+!tests/resources/*.sdf
 test_output/
 
 # Python artifacts
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 *.pyd
 *.egg
 *.egg-info/
 dist/
-build/
 .eggs/
 *.whl
 pip-wheel-metadata/
@@ -154,4 +150,6 @@ ENV/
 vcpkg_installed/
 
 # Logs
-*.log
+
+# Generated Python package staging (built extension + copied __init__.py)
+sdfgen/

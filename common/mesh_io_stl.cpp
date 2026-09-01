@@ -13,7 +13,6 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
-#include <memory>
 
 namespace meshio {
 
