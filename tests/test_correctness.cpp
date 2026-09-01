@@ -16,52 +16,6 @@
 #include <chrono>
 #include <cmath>
 
-/**
- * @brief Generate a simple unit cube mesh centered at origin
- *
- * Creates an axis-aligned cube with vertices at [-0.5, 0.5]^3. The cube has 8 vertices
- * and 12 triangles (2 per face). Used as a simple test mesh with known geometry for
- * validation and benchmarking.
- *
- * @param vertList Output parameter for 8 vertex positions
- * @param faceList Output parameter for 12 triangle indices
- * @param min_box Output parameter for bounding box minimum corner (-0.5, -0.5, -0.5)
- * @param max_box Output parameter for bounding box maximum corner (0.5, 0.5, 0.5)
- */
-void generate_unit_cube(std::vector<Vec3f>& vertList, std::vector<Vec3ui>& faceList,
-                        Vec3f& min_box, Vec3f& max_box) {
-    // 8 vertices of a unit cube: [-0.5, 0.5]^3
-    vertList = {
-        Vec3f(-0.5f, -0.5f, -0.5f),  // 0
-        Vec3f( 0.5f, -0.5f, -0.5f),  // 1
-        Vec3f( 0.5f,  0.5f, -0.5f),  // 2
-        Vec3f(-0.5f,  0.5f, -0.5f),  // 3
-        Vec3f(-0.5f, -0.5f,  0.5f),  // 4
-        Vec3f( 0.5f, -0.5f,  0.5f),  // 5
-        Vec3f( 0.5f,  0.5f,  0.5f),  // 6
-        Vec3f(-0.5f,  0.5f,  0.5f)   // 7
-    };
-
-    // 12 triangles (2 per face)
-    faceList = {
-        // Bottom face (z = -0.5)
-        Vec3ui(0, 1, 2), Vec3ui(0, 2, 3),
-        // Top face (z = 0.5)
-        Vec3ui(4, 6, 5), Vec3ui(4, 7, 6),
-        // Front face (y = -0.5)
-        Vec3ui(0, 5, 1), Vec3ui(0, 4, 5),
-        // Back face (y = 0.5)
-        Vec3ui(2, 7, 3), Vec3ui(2, 6, 7),
-        // Left face (x = -0.5)
-        Vec3ui(0, 3, 7), Vec3ui(0, 7, 4),
-        // Right face (x = 0.5)
-        Vec3ui(1, 6, 2), Vec3ui(1, 5, 6)
-    };
-
-    min_box = Vec3f(-0.5f, -0.5f, -0.5f);
-    max_box = Vec3f(0.5f, 0.5f, 0.5f);
-}
-
 int main(int argc, char* argv[]) {
     std::cout << "========================================\n";
     std::cout << "SDFGen Correctness Test\n";
@@ -81,22 +35,21 @@ int main(int argc, char* argv[]) {
     std::vector<Vec3ui> faceList;
     Vec3f min_box, max_box;
 
-    generate_unit_cube(vertList, faceList, min_box, max_box);
+    min_box = Vec3f(-0.5f, -0.5f, -0.5f);
+    max_box = Vec3f(0.5f, 0.5f, 0.5f);
+    test_utils::make_cube(min_box, max_box, vertList, faceList);
 
     std::cout << "Loaded mesh:\n";
     std::cout << "  Vertices:   " << vertList.size() << "\n";
     std::cout << "  Triangles:  " << faceList.size() << "\n";
     std::cout << "  Bounds:     (" << min_box << ") to (" << max_box << ")\n\n";
 
-    // Calculate grid parameters
-    Vec3f mesh_size = max_box - min_box;
-    float dx = mesh_size[0] / (grid_res - 2 * padding);
-    int ny = (int)((mesh_size[1] / dx) + 0.5f) + 2 * padding;
-    int nz = (int)((mesh_size[2] / dx) + 0.5f) + 2 * padding;
-
-    Vec3f grid_size(grid_res * dx, ny * dx, nz * dx);
-    Vec3f mesh_center = (min_box + max_box) * 0.5f;
-    Vec3f origin = mesh_center - grid_size * 0.5f;
+    // Calculate grid parameters (shared helper)
+    float dx;
+    int32_t ny, nz;
+    Vec3f origin;
+    test_utils::calculate_grid_parameters(min_box, max_box, grid_res, padding,
+                                          dx, ny, nz, origin);
 
     // Tolerance: Allow for error up to 50% of a cell width to account for
     // algorithmic differences between CPU (Gauss-Seidel) and GPU (Jacobi).

@@ -98,6 +98,9 @@ if(SDFGEN_BUILD_BENCHMARKS)
         benchmark_performance.cpp
     )
     target_link_libraries(benchmark_performance PRIVATE test_utils sdfgen_options)
+    target_compile_definitions(benchmark_performance PRIVATE
+        SDFGEN_TEST_RESOURCES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources/"
+    )
 endif()
 
 # ----------------------------------------------------------------------------

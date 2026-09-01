@@ -13,13 +13,12 @@ namespace cpu {
 /**
  * @brief Generate signed distance field using multi-threaded CPU implementation
  *
- * Computes a 3D signed distance field from a triangle mesh using CPU-based parallel processing.
- * The algorithm operates in two phases: (1) exact distance computation for grid cells within
- * exact_band of any triangle surface, and (2) fast sweeping to propagate distances to far-field
- * regions. The mesh should be closed and manifold for accurate inside/outside signs; triangle
- * soups will produce correct absolute distances but may have incorrect signs. The implementation
- * uses multi-threading to parallelize the computation across multiple CPU cores for improved
- * performance on large grids.
+ * Computes a 3D signed distance field from a triangle mesh on the CPU.
+ * The algorithm has two phases: exact distance computation for grid cells
+ * within exact_band of a triangle, then fast sweeping to propagate distances
+ * to the far field. The mesh should be closed and manifold for correct
+ * inside/outside signs. A triangle soup gets correct absolute distances, but
+ * its signs can be wrong. The sweep phase runs on multiple threads.
  *
  * @param tri Triangle indices defining mesh topology, each Vec3ui contains 3 vertex indices
  * @param x Vertex positions in world coordinates

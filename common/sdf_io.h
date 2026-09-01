@@ -29,6 +29,9 @@
  * @param out_inside_count Optional output: number of cells with negative SDF (inside mesh)
  * @return true on success, false on error
  */
+/// On-disk SDF header size: 3 x int32 dimensions + 6 x float32 bounds.
+constexpr int SDF_HEADER_BYTES = 36;
+
 bool write_sdf_binary(const std::string& filename,
                       const Array3f& phi_grid,
                       const Vec3f& min_box,

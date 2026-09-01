@@ -62,7 +62,11 @@ if(WIN32 AND HAVE_CUDA AND CUDAToolkit_FOUND)
     # Determine CUDA runtime DLL name based on CUDA version
     set(CUDA_VERSION_MAJOR ${CUDAToolkit_VERSION_MAJOR})
     set(CUDART_DLL_NAME "cudart64_${CUDA_VERSION_MAJOR}.dll")
+    # CUDA 12 ships the DLL in bin/, CUDA 13 moved it to bin/x64/
     set(CUDART_DLL_PATH "${CUDAToolkit_BIN_DIR}/${CUDART_DLL_NAME}")
+    if(NOT EXISTS "${CUDART_DLL_PATH}")
+        set(CUDART_DLL_PATH "${CUDAToolkit_BIN_DIR}/x64/${CUDART_DLL_NAME}")
+    endif()
 
     if(EXISTS "${CUDART_DLL_PATH}")
         add_custom_command(TARGET sdfgen_ext POST_BUILD

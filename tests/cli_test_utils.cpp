@@ -5,6 +5,7 @@
 // CLI testing utilities implementation
 
 #include "cli_test_utils.h"
+#include "sdf_io.h"
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
@@ -32,7 +33,7 @@
 namespace cli_test {
 
 // Constants
-constexpr int32_t SDF_HEADER_SIZE = 36;  // 3 ints + 6 floats = 12 + 24 = 36 bytes
+constexpr int32_t SDF_HEADER_SIZE = SDF_HEADER_BYTES;  // from sdf_io.h
 constexpr int32_t SIZEOF_FLOAT = 4;
 constexpr int32_t BUFFER_SIZE = 4096;
 
@@ -339,6 +340,111 @@ void assert_sdf_dimensions(
                   << ", got " << info.nx << "x" << info.ny << "x" << info.nz << "\n";
         throw std::runtime_error("Dimension mismatch");
     }
+}
+
+bool expect_success(const SuccessCase& c, const TestConfig& config) {
+    std::cout << "\n--- " << c.title << " ---\n";
+
+    std::string output_path;
+    if (!c.output_name.empty()) {
+        output_path = config.test_resources_dir + c.output_name;
+        delete_file_if_exists(output_path);
+    }
+
+    CommandResult result = run_sdfgen(c.args, config);
+
+    bool ok = true;
+    if (result.execution_failed || result.exit_code != 0) {
+        std::cerr << "[FAIL] " << c.title << ": expected exit code 0, got "
+                  << result.exit_code << "\n";
+        std::cerr << "Output: " << result.stdout_output << "\n";
+        ok = false;
+    }
+
+    if (ok && !output_path.empty()) {
+        if (!file_exists(output_path)) {
+            std::cerr << "[FAIL] " << c.title << ": expected output file missing: "
+                      << output_path << "\n";
+            ok = false;
+        } else {
+            SDFFileInfo info = read_sdf_header(output_path);
+            if (!info.valid) {
+                std::cerr << "[FAIL] " << c.title << ": output SDF header/size invalid\n";
+                ok = false;
+            } else if (c.nx > 0 &&
+                       (info.nx != c.nx || info.ny != c.ny || info.nz != c.nz)) {
+                std::cerr << "[FAIL] " << c.title << ": expected " << c.nx << "x"
+                          << c.ny << "x" << c.nz << ", got " << info.nx << "x"
+                          << info.ny << "x" << info.nz << "\n";
+                ok = false;
+            }
+        }
+    }
+
+    if (ok) {
+        for (const std::string& text : c.expect_output) {
+            if (!string_contains(result.stdout_output, text)) {
+                std::cerr << "[FAIL] " << c.title << ": output does not contain '"
+                          << text << "'\n";
+                std::cerr << "Output: " << result.stdout_output << "\n";
+                ok = false;
+                break;
+            }
+        }
+    }
+
+    if (!output_path.empty()) {
+        delete_file_if_exists(output_path);
+    }
+    if (ok) {
+        std::cout << "[PASS] " << c.title << "\n";
+    }
+    return ok;
+}
+
+bool expect_failure(const FailureCase& c, const TestConfig& config) {
+    std::cout << "\n--- " << c.title << " ---\n";
+
+    CommandResult result = run_sdfgen(c.args, config);
+
+    if (result.exit_code == 0) {
+        std::cerr << "[FAIL] " << c.title << ": expected a non-zero exit code\n";
+        std::cerr << "Output: " << result.stdout_output << "\n";
+        return false;
+    }
+
+    if (!c.expect_any_output.empty()) {
+        bool found = false;
+        for (const std::string& text : c.expect_any_output) {
+            if (string_contains(result.stdout_output, text)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            std::cerr << "[FAIL] " << c.title
+                      << ": none of the expected messages appeared\n";
+            std::cerr << "Output: " << result.stdout_output << "\n";
+            return false;
+        }
+    }
+
+    std::cout << "[PASS] " << c.title << "\n";
+    return true;
+}
+
+int summarize(const std::string& suite, int32_t failures, int32_t total) {
+    std::cout << "\n========================================\n";
+    std::cout << suite << " Summary\n";
+    std::cout << "========================================\n";
+    std::cout << "Tests run: " << total << "\n";
+    std::cout << "Failures: " << failures << "\n";
+    if (failures == 0) {
+        std::cout << "[PASS] ALL " << suite << " TESTS PASSED\n";
+        return 0;
+    }
+    std::cout << "[FAIL] SOME " << suite << " TESTS FAILED\n";
+    return 1;
 }
 
 } // namespace cli_test

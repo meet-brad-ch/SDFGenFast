@@ -226,4 +226,44 @@ void assert_sdf_dimensions(
     const std::string& test_name
 );
 
+/**
+ * @brief One successful CLI invocation with output validation
+ *
+ * expect_success runs SDFGen with the given arguments and validates:
+ * exit code 0; if output_name is set, that the file exists in the test
+ * resources directory, has a valid header, matches the expected
+ * dimensions (when nx > 0) and the header-implied file size. Required
+ * stdout substrings are checked last. The output file is deleted before
+ * and after the run.
+ */
+struct SuccessCase {
+    std::string title;                       ///< Name printed in the report
+    std::vector<std::string> args;           ///< CLI arguments (input paths resolved by caller)
+    std::string output_name;                 ///< Expected .sdf name in resources dir ("" = skip file checks)
+    int32_t nx = 0, ny = 0, nz = 0;          ///< Expected dimensions (nx == 0 skips the check)
+    std::vector<std::string> expect_output;  ///< Substrings that must appear in stdout
+};
+
+/**
+ * @brief One failing CLI invocation
+ *
+ * expect_failure runs SDFGen and validates a non-zero exit code. When
+ * expect_any_output is non-empty, at least one listed substring must
+ * appear in the output.
+ */
+struct FailureCase {
+    std::string title;                          ///< Name printed in the report
+    std::vector<std::string> args;              ///< CLI arguments
+    std::vector<std::string> expect_any_output; ///< At least one must appear ({} = skip)
+};
+
+/// Run a success case. Returns true when every check passes.
+bool expect_success(const SuccessCase& c, const TestConfig& config);
+
+/// Run a failure case. Returns true when the command fails as expected.
+bool expect_failure(const FailureCase& c, const TestConfig& config);
+
+/// Print the suite summary and return the process exit code (0 = all passed).
+int summarize(const std::string& suite, int32_t failures, int32_t total);
+
 } // namespace cli_test
