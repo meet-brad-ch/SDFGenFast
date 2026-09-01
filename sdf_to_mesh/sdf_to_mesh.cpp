@@ -7,13 +7,9 @@
 #include <vector>
 #include <cmath>
 
-struct Vec3f {
-    float x, y, z;
-    Vec3f() : x(0), y(0), z(0) {}
-    Vec3f(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
-    Vec3f operator+(const Vec3f& v) const { return Vec3f(x+v.x, y+v.y, z+v.z); }
-    Vec3f operator*(float s) const { return Vec3f(x*s, y*s, z*s); }
-};
+#include "vec.h"
+#include "array3.h"
+#include "sdf_io.h"
 
 // Marching cubes edge table
 static const int edgeTable[256] = {
@@ -342,48 +338,38 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Reading SDF: " << input_path << "\n";
 
-    // Read SDF file
-    std::ifstream file(input_path.c_str(), std::ios::binary);
-    if (!file) {
-        std::cerr << "Error: Cannot open " << input_path << "\n";
+    // Read the SDF through the shared, validated reader.
+    Array3f phi;
+    Vec3f min_box, max_box;
+    if (!read_sdf_binary(input_path, phi, min_box, max_box)) {
+        std::cerr << "Error: Failed to read " << input_path << "\n";
         return 1;
     }
-
-    // Read header (36 bytes)
-    int nx, ny, nz;
-    float xmin, ymin, zmin, xmax, ymax, zmax;
-    file.read(reinterpret_cast<char*>(&nx), sizeof(int));
-    file.read(reinterpret_cast<char*>(&ny), sizeof(int));
-    file.read(reinterpret_cast<char*>(&nz), sizeof(int));
-    file.read(reinterpret_cast<char*>(&xmin), sizeof(float));
-    file.read(reinterpret_cast<char*>(&ymin), sizeof(float));
-    file.read(reinterpret_cast<char*>(&zmin), sizeof(float));
-    file.read(reinterpret_cast<char*>(&xmax), sizeof(float));
-    file.read(reinterpret_cast<char*>(&ymax), sizeof(float));
-    file.read(reinterpret_cast<char*>(&zmax), sizeof(float));
+    const int nx = phi.ni;
+    const int ny = phi.nj;
+    const int nz = phi.nk;
+    const float xmin = min_box[0];
+    const float ymin = min_box[1];
+    const float zmin = min_box[2];
 
     std::cout << "Grid: " << nx << " x " << ny << " x " << nz << "\n";
     std::cout << "Bounds: (" << xmin << ", " << ymin << ", " << zmin << ") to ("
-              << xmax << ", " << ymax << ", " << zmax << ")\n";
+              << max_box[0] << ", " << max_box[1] << ", " << max_box[2] << ")\n";
 
-    // Read SDF data
-    std::vector<float> sdf(nx * ny * nz);
-    file.read(reinterpret_cast<char*>(sdf.data()), sdf.size() * sizeof(float));
-    file.close();
-
-    // Calculate cell size
-    float dx = (xmax - xmin) / (nx - 1);
-    float dy = (ymax - ymin) / (ny - 1);
-    float dz = (zmax - zmin) / (nz - 1);
+    // Cell size. The writer stores bounds_max = bounds_min + n*dx, so the
+    // divisor is n - dividing by (n-1) scaled every extracted mesh by
+    // n/(n-1) and shifted it.
+    float dx = (max_box[0] - xmin) / nx;
+    float dy = (max_box[1] - ymin) / ny;
+    float dz = (max_box[2] - zmin) / nz;
 
     std::cout << "Cell size: " << dx << " x " << dy << " x " << dz << "\n";
     std::cout << "Isolevel: " << isolevel << "\n";
     std::cout << "Running marching cubes...\n";
 
-    // Lambda to get SDF value
-    // SDF stored in C-order: for(i) for(j) for(k) - k varies fastest
+    // Sample accessor (Array3f handles the memory layout)
     auto getSDF = [&](int i, int j, int k) -> float {
-        return sdf[k + j * nz + i * ny * nz];
+        return phi(i, j, k);
     };
 
     // Marching cubes
@@ -473,7 +459,7 @@ int main(int argc, char* argv[]) {
     obj << "# Triangles: " << (indices.size()/3) << "\n\n";
 
     for (const auto& v : vertices) {
-        obj << "v " << v.x << " " << v.y << " " << v.z << "\n";
+        obj << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
     }
 
     for (size_t i = 0; i < indices.size(); i += 3) {

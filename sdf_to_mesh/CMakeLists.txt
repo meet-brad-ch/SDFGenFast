@@ -7,5 +7,6 @@ add_executable(sdf_to_mesh
 
 target_link_libraries(sdf_to_mesh PRIVATE
     CLI11::CLI11
+    sdfgen_common
     sdfgen_options
 )
