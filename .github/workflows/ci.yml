@@ -23,7 +23,7 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSDFGEN_BUILD_GPU=OFF
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DSDFGEN_BUILD_GPU=OFF -DSDFGEN_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build --config Release
@@ -75,6 +75,7 @@ jobs:
       - name: Configure
         run: >
           cmake -B build -DCMAKE_BUILD_TYPE=Release
+          -DSDFGEN_WARNINGS_AS_ERRORS=ON
           -DCUDAToolkit_ROOT=/usr/local/cuda-13.0
           -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.0/bin/nvcc
 

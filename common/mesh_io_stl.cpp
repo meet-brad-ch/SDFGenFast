@@ -58,7 +58,7 @@ static STLFormat detect_stl_format(const char* filename) {
     int64_t header_len = (bytes_read < static_cast<int64_t>(STL_HEADER_SIZE)) ? bytes_read : static_cast<int64_t>(STL_HEADER_SIZE);
     std::string header_str(header, static_cast<size_t>(header_len));
     std::transform(header_str.begin(), header_str.end(), header_str.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     if (header_str.find("solid") == 0) {
         // Could be ASCII, but binary files sometimes have "solid" in header
@@ -236,7 +236,7 @@ static bool load_ascii_stl(const char* filename,
         // Convert to lowercase for keyword matching
         std::string line_lower = line;
         std::transform(line_lower.begin(), line_lower.end(), line_lower.begin(),
-                      [](unsigned char c) { return std::tolower(c); });
+                      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
         if (line_lower.find("solid") == 0) {
             in_solid = true;
