@@ -213,7 +213,6 @@ int main(int argc, char* argv[]) {
 
     // Recalculate bounds to exactly fit the target grid with calculated dx
     // Center the mesh in the grid with padding on all sides
-    Vec3f mesh_size = max_box - min_box;
     Vec3f grid_size = Vec3f(sizes[0] * dx, sizes[1] * dx, sizes[2] * dx);
     Vec3f mesh_center = (min_box + max_box) * 0.5f;
 

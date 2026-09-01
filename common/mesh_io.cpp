@@ -21,7 +21,7 @@ std::string get_extension(const std::string& filename) {
 
     // Convert to lowercase
     std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     return ext;
 }

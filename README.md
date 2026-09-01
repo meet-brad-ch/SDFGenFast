@@ -1,5 +1,10 @@
 # SDFGen
 
+[![CI](https://github.com/meet-radek/SDFGenFast/actions/workflows/ci.yml/badge.svg)](https://github.com/meet-radek/SDFGenFast/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/meet-radek/SDFGenFast)](https://github.com/meet-radek/SDFGenFast/releases)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)](python/README.md)
+
 A command-line tool and Python library that generates grid-based signed distance fields (SDFs) from triangle meshes.
 
 This is an enhanced fork of [Christopher Batty's SDFGen](https://github.com/christopherbatty/SDFGen). The fork adds GPU acceleration, a multi-threaded CPU path, automatic hardware detection, Python bindings, and a cross-platform CMake build. See [CHANGELOG.md](CHANGELOG.md) for the full list of changes.
