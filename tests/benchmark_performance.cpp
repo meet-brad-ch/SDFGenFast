@@ -204,60 +204,34 @@ int main(int argc, char* argv[]) {
 
         result.total_cells = config.grid_size * ny * nz;
 
-        // CPU 1-thread benchmark
+        // CPU benchmarks at fixed and auto thread counts
         std::cout << "  CPU (1 thread)... " << std::flush;
-        Array3f phi_cpu1;
-        double time_1thread;
-        {
-            auto start = std::chrono::high_resolution_clock::now();
-            sdfgen::make_level_set3(faces, verts, origin, dx, config.grid_size, ny, nz,
-                                   phi_cpu1, 1, sdfgen::HardwareBackend::CPU, 1);  // Force 1 thread
-            auto end = std::chrono::high_resolution_clock::now();
-            time_1thread = std::chrono::duration<double, std::milli>(end - start).count();
-        }
-        result.cpu_1thread_ms = time_1thread;
+        Array3f phi_cpu;
+        test_utils::generate_sdf_with_timing(faces, verts, origin, dx,
+                                             config.grid_size, ny, nz, phi_cpu,
+                                             sdfgen::HardwareBackend::CPU,
+                                             result.cpu_1thread_ms, 1);
         std::cout << result.cpu_1thread_ms << " ms\n";
 
-        // CPU 10-thread benchmark
         std::cout << "  CPU (10 threads)... " << std::flush;
-        Array3f phi_cpu_10;
-        double time_10thread;
-        {
-            auto start = std::chrono::high_resolution_clock::now();
-            sdfgen::make_level_set3(faces, verts, origin, dx, config.grid_size, ny, nz,
-                                   phi_cpu_10, 1, sdfgen::HardwareBackend::CPU, 10);
-            auto end = std::chrono::high_resolution_clock::now();
-            time_10thread = std::chrono::duration<double, std::milli>(end - start).count();
-        }
-        result.cpu_10thread_ms = time_10thread;
+        test_utils::generate_sdf_with_timing(faces, verts, origin, dx,
+                                             config.grid_size, ny, nz, phi_cpu,
+                                             sdfgen::HardwareBackend::CPU,
+                                             result.cpu_10thread_ms, 10);
         std::cout << result.cpu_10thread_ms << " ms\n";
 
-        // CPU 20-thread benchmark
         std::cout << "  CPU (20 threads)... " << std::flush;
-        Array3f phi_cpu_20;
-        double time_20thread;
-        {
-            auto start = std::chrono::high_resolution_clock::now();
-            sdfgen::make_level_set3(faces, verts, origin, dx, config.grid_size, ny, nz,
-                                   phi_cpu_20, 1, sdfgen::HardwareBackend::CPU, 20);
-            auto end = std::chrono::high_resolution_clock::now();
-            time_20thread = std::chrono::duration<double, std::milli>(end - start).count();
-        }
-        result.cpu_20thread_ms = time_20thread;
+        test_utils::generate_sdf_with_timing(faces, verts, origin, dx,
+                                             config.grid_size, ny, nz, phi_cpu,
+                                             sdfgen::HardwareBackend::CPU,
+                                             result.cpu_20thread_ms, 20);
         std::cout << result.cpu_20thread_ms << " ms\n";
 
-        // CPU multi-threaded benchmark (max threads)
         std::cout << "  CPU (" << cpu_threads << " threads)... " << std::flush;
-        Array3f phi_cpu_mt;
-        double time_max_thread;
-        {
-            auto start = std::chrono::high_resolution_clock::now();
-            sdfgen::make_level_set3(faces, verts, origin, dx, config.grid_size, ny, nz,
-                                   phi_cpu_mt, 1, sdfgen::HardwareBackend::CPU, 0);  // Auto-detect threads
-            auto end = std::chrono::high_resolution_clock::now();
-            time_max_thread = std::chrono::duration<double, std::milli>(end - start).count();
-        }
-        result.cpu_max_thread_ms = time_max_thread;
+        test_utils::generate_sdf_with_timing(faces, verts, origin, dx,
+                                             config.grid_size, ny, nz, phi_cpu,
+                                             sdfgen::HardwareBackend::CPU,
+                                             result.cpu_max_thread_ms, 0);
         std::cout << result.cpu_max_thread_ms << " ms\n";
 
         // GPU benchmark

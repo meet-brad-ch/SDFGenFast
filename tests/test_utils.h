@@ -87,6 +87,7 @@ struct SDFComparisonResult {
  * @param phi Output SDF grid (will be resized)
  * @param backend Hardware backend selection (CPU or GPU)
  * @param time_ms Output parameter for execution time in milliseconds
+ * @param num_threads CPU thread count (0 = auto-detect; ignored on GPU)
  */
 void generate_sdf_with_timing(
     const std::vector<Vec3ui>& faceList,
@@ -96,7 +97,8 @@ void generate_sdf_with_timing(
     int32_t nx, int32_t ny, int32_t nz,
     Array3f& phi,
     sdfgen::HardwareBackend backend,
-    double& time_ms
+    double& time_ms,
+    int32_t num_threads = 0
 );
 
 /**
@@ -234,5 +236,40 @@ void calculate_grid_parameters(
     int32_t& nz,
     Vec3f& origin
 );
+
+/**
+ * @brief Build an axis-aligned closed cube mesh
+ *
+ * Produces 8 vertices and 12 triangles (2 per face) spanning
+ * [min_corner, max_corner]. Winding is outward (CCW seen from outside).
+ *
+ * @param min_corner Cube minimum corner
+ * @param max_corner Cube maximum corner
+ * @param vertices Output vertex list (replaced)
+ * @param faces Output triangle list (replaced)
+ */
+void make_cube(const Vec3f& min_corner, const Vec3f& max_corner,
+               std::vector<Vec3f>& vertices, std::vector<Vec3ui>& faces);
+
+/**
+ * @brief Shared body of the OBJ/STL file I/O round-trip tests
+ *
+ * Loads the mesh with the given loader, computes proportional grid
+ * parameters, runs the CPU/GPU round-trip comparison and prints the
+ * summary. Output files are deleted afterwards.
+ *
+ * @param banner Test banner to print
+ * @param loader meshio::load_obj or meshio::load_stl
+ * @param default_mesh Resource file name used when argv does not name one
+ * @param cpu_filename Temporary CPU-result SDF path
+ * @param gpu_filename Temporary GPU-result SDF path
+ * @return Process exit code (0 = passed)
+ */
+int run_mesh_file_io_test(const char* banner,
+                          bool (*loader)(const char*, std::vector<Vec3f>&,
+                                         std::vector<Vec3ui>&, Vec3f&, Vec3f&),
+                          const char* default_mesh,
+                          const char* cpu_filename,
+                          const char* gpu_filename);
 
 } // namespace test_utils

@@ -5,6 +5,7 @@
 // Test utilities implementation
 
 #include "test_utils.h"
+#include "grid_sizing.h"
 #include <iostream>
 #include <chrono>
 #include <cmath>
@@ -21,10 +22,12 @@ void generate_sdf_with_timing(
     int32_t nx, int32_t ny, int32_t nz,
     Array3f& phi,
     sdfgen::HardwareBackend backend,
-    double& time_ms
+    double& time_ms,
+    int32_t num_threads
 ) {
     auto start = std::chrono::high_resolution_clock::now();
-    sdfgen::make_level_set3(faceList, vertList, origin, dx, nx, ny, nz, phi, 1, backend);
+    sdfgen::make_level_set3(faceList, vertList, origin, dx, nx, ny, nz, phi, 1, backend,
+                            num_threads);
     auto end = std::chrono::high_resolution_clock::now();
     time_ms = std::chrono::duration<double, std::milli>(end - start).count();
 }
@@ -304,25 +307,96 @@ void calculate_grid_parameters(
     int32_t& nz,
     Vec3f& origin
 ) {
-    Vec3f mesh_size = max_box - min_box;
-
-    // Calculate cell size based on target X dimension
-    dx = mesh_size[0] / (target_nx - 2 * padding);
-
-    // Calculate Y and Z dimensions to maintain aspect ratio
-    ny = static_cast<int32_t>((mesh_size[1] / dx) + 0.5f) + 2 * padding;
-    nz = static_cast<int32_t>((mesh_size[2] / dx) + 0.5f) + 2 * padding;
-
-    // Calculate grid size and origin (centered)
-    Vec3f grid_size(target_nx * dx, ny * dx, nz * dx);
-    Vec3f mesh_center = (min_box + max_box) * 0.5f;
-    origin = mesh_center - grid_size * 0.5f;
+    // Same math as the CLI (common/grid_sizing.h)
+    sdfgen::GridParameters grid = sdfgen::proportional_grid(min_box, max_box, target_nx, padding);
+    dx = grid.dx;
+    ny = grid.ny;
+    nz = grid.nz;
+    origin = grid.origin;
 
     std::cout << "Grid parameters:\n";
     std::cout << "  Dimensions: " << target_nx << " x " << ny << " x " << nz << "\n";
     std::cout << "  Total cells: " << (target_nx * ny * nz) << "\n";
     std::cout << "  Cell size:  " << dx << " m\n";
     std::cout << "  Origin:     (" << origin << ")\n\n";
+}
+
+void make_cube(const Vec3f& min_corner, const Vec3f& max_corner,
+               std::vector<Vec3f>& vertices, std::vector<Vec3ui>& faces) {
+    const float x0 = min_corner[0], y0 = min_corner[1], z0 = min_corner[2];
+    const float x1 = max_corner[0], y1 = max_corner[1], z1 = max_corner[2];
+    vertices = {
+        Vec3f(x0, y0, z0), Vec3f(x1, y0, z0), Vec3f(x1, y1, z0), Vec3f(x0, y1, z0),
+        Vec3f(x0, y0, z1), Vec3f(x1, y0, z1), Vec3f(x1, y1, z1), Vec3f(x0, y1, z1)
+    };
+    faces = {
+        // Bottom face (z = z0)
+        Vec3ui(0, 1, 2), Vec3ui(0, 2, 3),
+        // Top face (z = z1)
+        Vec3ui(4, 6, 5), Vec3ui(4, 7, 6),
+        // Front face (y = y0)
+        Vec3ui(0, 5, 1), Vec3ui(0, 4, 5),
+        // Back face (y = y1)
+        Vec3ui(2, 7, 3), Vec3ui(2, 6, 7),
+        // Left face (x = x0)
+        Vec3ui(0, 3, 7), Vec3ui(0, 7, 4),
+        // Right face (x = x1)
+        Vec3ui(1, 6, 2), Vec3ui(1, 5, 6)
+    };
+}
+
+int run_mesh_file_io_test(const char* banner,
+                          bool (*loader)(const char*, std::vector<Vec3f>&,
+                                         std::vector<Vec3ui>&, Vec3f&, Vec3f&),
+                          const char* default_mesh,
+                          const char* cpu_filename,
+                          const char* gpu_filename) {
+    std::cout << "========================================\n";
+    std::cout << banner << "\n";
+    std::cout << "========================================\n\n";
+
+#ifdef SDFGEN_TEST_RESOURCES_DIR
+    const std::string mesh_path = std::string(SDFGEN_TEST_RESOURCES_DIR) + default_mesh;
+#else
+    const std::string mesh_path = std::string("./resources/") + default_mesh;
+#endif
+    const int32_t target_nx = 32;  // Small grid for fast testing
+    const int32_t padding = 1;
+
+    std::cout << "Test Configuration:\n";
+    std::cout << "  Mesh file:  " << mesh_path << "\n";
+    std::cout << "  Target Nx:  " << target_nx << "\n";
+    std::cout << "  Padding:    " << padding << "\n\n";
+
+    std::vector<Vec3f> vertList;
+    std::vector<Vec3ui> faceList;
+    Vec3f min_box, max_box;
+
+    if (!loader(mesh_path.c_str(), vertList, faceList, min_box, max_box)) {
+        std::cerr << "ERROR: Failed to load mesh file\n";
+        return 1;
+    }
+
+    print_mesh_info(vertList, faceList, min_box, max_box);
+
+    float dx;
+    int32_t ny, nz;
+    Vec3f origin;
+    calculate_grid_parameters(min_box, max_box, target_nx, padding, dx, ny, nz, origin);
+
+    SDFComparisonResult result;
+    if (!test_sdf_io_roundtrip(faceList, vertList, origin, dx,
+                               target_nx, ny, nz,
+                               cpu_filename, gpu_filename, result)) {
+        return 1;
+    }
+
+    print_test_summary(banner, result);
+
+    std::remove(cpu_filename);
+    std::remove(gpu_filename);
+
+    return result.passed() ? 0 : 1;
 }
 
 } // namespace test_utils

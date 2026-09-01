@@ -6,7 +6,8 @@
 #include "sdfgen_unified.h"  // Unified API with CPU/GPU backend selection
 #include "sdf_io.h"          // Shared SDF file I/O functions
 #include "mesh_io.h"         // Mesh file loading (OBJ, STL)
-#include "mesh_repair.h"     // Mesh watertightness check and repair
+#include "mesh_repair.h"
+#include "grid_sizing.h"     // Mesh watertightness check and repair
 #include <CLI/CLI.hpp>
 #include <cmath>
 
@@ -58,11 +59,8 @@ int main(int argc, char* argv[]) {
 
   CLI11_PARSE(app, argc, argv);
 
-  // Detect file type
-  std::string ext = filename.substr(filename.find_last_of(".") + 1);
-  std::transform(ext.begin(), ext.end(), ext.begin(),
-                 [](unsigned char c) { return static_cast<char>(::tolower(c)); });
-  bool is_stl = (ext == "stl");
+  // Detect file type (shared helper returns the lowercase extension with dot)
+  bool is_stl = (meshio::get_extension(filename) == ".stl");
   bool use_grid_dimensions = is_stl;  // STL mode sizes by grid dimensions, OBJ mode by cell size dx
 
   // Validate dimensions
@@ -114,12 +112,11 @@ int main(int argc, char* argv[]) {
       }
       if(padding < 1) padding = 1;
 
-      // Calculate dx based on X dimension
-      dx = mesh_size[0] / (target_nx - 2 * padding);
-
-      // Calculate Ny and Nz proportionally to maintain aspect ratio
-      target_ny = (int)((mesh_size[1] / dx) + 0.5f) + 2 * padding;
-      target_nz = (int)((mesh_size[2] / dx) + 0.5f) + 2 * padding;
+      // Shared sizing helper (common/grid_sizing.h)
+      sdfgen::GridParameters grid = sdfgen::proportional_grid(min_box, max_box, target_nx, padding);
+      dx = grid.dx;
+      target_ny = grid.ny;
+      target_nz = grid.nz;
 
       std::cout << "Mode: Proportional dimensions\n";
       std::cout << "Input Nx: " << target_nx << "\n";
@@ -141,11 +138,8 @@ int main(int argc, char* argv[]) {
       }
       if(padding < 1) padding = 1;
 
-      // Calculate dx to fit the mesh into target grid
-      float dx_x = mesh_size[0] / (target_nx - 2 * padding);
-      float dx_y = mesh_size[1] / (target_ny - 2 * padding);
-      float dx_z = mesh_size[2] / (target_nz - 2 * padding);
-      dx = std::max(dx_x, std::max(dx_y, dx_z));
+      // Shared sizing helper (common/grid_sizing.h)
+      dx = sdfgen::manual_grid(min_box, max_box, target_nx, target_ny, target_nz, padding).dx;
 
       std::cout << "Mode: Manual dimensions\n";
       std::cout << "Target grid: " << target_nx << " x " << target_ny << " x " << target_nz << "\n";
@@ -344,7 +338,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "\n";
 
-    long long file_size_bytes = 36 + (long long)total_count * sizeof(float);
+    long long file_size_bytes = SDF_HEADER_BYTES + (long long)total_count * sizeof(float);
     float file_size_mb = file_size_bytes / (1024.0f * 1024.0f);
     std::cout << "File size: " << file_size_mb << " MB\n";
     std::cout << "========================================\n";
