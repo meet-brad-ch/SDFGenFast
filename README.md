@@ -1,8 +1,8 @@
 # SDFGen
 
-[![CI](https://github.com/meet-radek/SDFGenFast/actions/workflows/ci.yml/badge.svg)](https://github.com/meet-radek/SDFGenFast/actions/workflows/ci.yml)
+[![CI](https://github.com/meet-brad-ch/SDFGenFast/actions/workflows/ci.yml/badge.svg)](https://github.com/meet-brad-ch/SDFGenFast/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/meet-radek/SDFGenFast)](https://github.com/meet-radek/SDFGenFast/releases)
+[![GitHub release](https://img.shields.io/github/v/release/meet-brad-ch/SDFGenFast)](https://github.com/meet-brad-ch/SDFGenFast/releases)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)](python/README.md)
 
 A command-line tool and Python library that generates grid-based signed distance fields (SDFs) from triangle meshes.
@@ -29,7 +29,7 @@ This is an enhanced fork of [Christopher Batty's SDFGen](https://github.com/chri
 Build from source. See [BUILD.md](BUILD.md) for full instructions.
 
 ```bash
-git clone --recurse-submodules https://github.com/meet-radek/SDFGenFast
+git clone --recurse-submodules https://github.com/meet-brad-ch/SDFGenFast
 cd SDFGenFast
 cmake -B build-Release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-Release
@@ -259,7 +259,7 @@ Batty, C. (2015). SDFGen. https://github.com/christopherbatty/SDFGen
 And if you use the GPU-accelerated version:
 
 ```
-Chamberlain, B. (2025). SDFGenFast. https://github.com/meet-radek/SDFGenFast
+Chamberlain, B. (2025). SDFGenFast. https://github.com/meet-brad-ch/SDFGenFast
 ```
 
 ---

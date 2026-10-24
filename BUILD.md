@@ -48,7 +48,7 @@ sudo apt-get install build-essential cmake ninja-build git
 The build scripts in `tools/` are a git submodule. Clone with:
 
 ```bash
-git clone --recurse-submodules https://github.com/meet-radek/SDFGenFast
+git clone --recurse-submodules https://github.com/meet-brad-ch/SDFGenFast
 ```
 
 If you already cloned without submodules:

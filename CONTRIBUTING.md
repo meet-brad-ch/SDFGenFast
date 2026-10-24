@@ -7,7 +7,7 @@ Thank you for your interest in contributing. This document describes how to buil
 See [BUILD.md](BUILD.md) for the full instructions. The short version:
 
 ```bash
-git clone --recurse-submodules https://github.com/meet-radek/SDFGenFast
+git clone --recurse-submodules https://github.com/meet-brad-ch/SDFGenFast
 cd SDFGenFast
 cmake -B build-Release -DCMAKE_BUILD_TYPE=Release
 cmake --build build-Release
