@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "sdfgen"
-version = "2.2.0"
+version = "2.3.0"
 description = "GPU-accelerated signed distance field generation from triangle meshes"
 readme = "README.md"
 license = {text = "MIT"}

@@ -20,7 +20,7 @@ Build guide for the C++ library, CLI tool, and Python bindings.
 
 | Component | Requirement |
 |-----------|-------------|
-| C++ compiler | C++17: Visual Studio 2022 or 2026 (Windows), GCC 9+ or Clang 10+ (Linux) |
+| C++ compiler | C++20: Visual Studio 2026 or 2022 (Windows), GCC 13 (Linux). The build and CI use these. |
 | CMake | 3.23 or newer |
 | Build system | Ninja (recommended) or Make; Ninja ships with Visual Studio |
 

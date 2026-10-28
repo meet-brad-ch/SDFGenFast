@@ -290,4 +290,4 @@ python/
 
 ---
 
-**Requires:** Python 3.8+, NumPy 1.20+. Version: 2.2.0 (see [CHANGELOG.md](../CHANGELOG.md)).
+**Requires:** Python 3.8+, NumPy 1.20+. Version: 2.3.0 (see [CHANGELOG.md](../CHANGELOG.md)).

@@ -2,6 +2,19 @@
 
 All notable changes to SDFGenFast, relative to the [original SDFGen](https://github.com/christopherbatty/SDFGen) by Christopher Batty.
 
+## 2.3.0 - 2026-10-27
+
+Build release: the project builds as C++20. The results do not change.
+
+### Changed
+
+- **C++20.** Every C++ target, the CUDA library and the Python extension build with C++20 (before: C++17). A project that includes the headers in C++20 now uses the same standard as the library's own build and CI.
+- **Build scripts.** The `tools/` submodule moves to the current `cmake-build-scripts`. That version fixes two Windows argument defects, sets the executable bit on `configure.sh` and `build.sh`, and adds `--dir NAME` for a second build directory.
+
+### Fixed
+
+- **`Vec` constructors in C++20.** `common/vec.h` declared its constructors as `Vec<N,T>(...)`. C++20 does not allow a template-id in a constructor declaration (CWG 2237). GCC rejects the header in a C++20 project. The constructors are now `Vec(...)`, which is valid in C++17 and C++20.
+
 ## 2.2.0 - 2026-08-31
 
 Audit release: bug fixes, build modernization, and test consolidation. No new features.

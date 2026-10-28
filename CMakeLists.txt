@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 
-project(SDFGen VERSION 2.2.0 LANGUAGES CXX)
+project(SDFGen VERSION 2.3.0 LANGUAGES CXX)
 
 # Default to a Release build for single-configuration generators.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -40,7 +40,7 @@ set(SDFGEN_CUDA_ARCHITECTURES "all-major" CACHE STRING
 # strict warning flags, and the include path of the generated config.h.
 # CUDA device code is unaffected: the flags are gated on COMPILE_LANGUAGE:CXX.
 add_library(sdfgen_options INTERFACE)
-target_compile_features(sdfgen_options INTERFACE cxx_std_17)
+target_compile_features(sdfgen_options INTERFACE cxx_std_20)
 if(MSVC)
     target_compile_options(sdfgen_options INTERFACE
         $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive- /utf-8>)

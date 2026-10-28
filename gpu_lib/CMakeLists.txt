@@ -19,7 +19,7 @@ target_link_libraries(sdfgen_gpu
 # (default all-major) so CI runners and user GPUs are not locked to the
 # author's hardware.
 set_target_properties(sdfgen_gpu PROPERTIES
-    CUDA_STANDARD 17
+    CUDA_STANDARD 20
     CUDA_STANDARD_REQUIRED ON
     CUDA_SEPARABLE_COMPILATION OFF
     CUDA_ARCHITECTURES "${SDFGEN_CUDA_ARCHITECTURES}"

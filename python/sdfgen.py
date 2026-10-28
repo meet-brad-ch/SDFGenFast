@@ -21,7 +21,7 @@ Basic usage:
     >>> sdfgen.save_sdf("output.sdf", sdf, origin=(0, 0, 0), dx=0.01)
 """
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 __author__ = "Brad Chamberlain, Christopher Batty"
 __license__ = "MIT"
 

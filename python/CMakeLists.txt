@@ -32,7 +32,7 @@ nanobind_add_module(sdfgen_ext sdfgen_py.cpp)
 target_link_libraries(sdfgen_ext PRIVATE
     sdfgen_common
 )
-target_compile_features(sdfgen_ext PRIVATE cxx_std_17)
+target_compile_features(sdfgen_ext PRIVATE cxx_std_20)
 
 # Post-build: Create ready-to-use package structure at project root
 # (developer convenience only; the directory is gitignored). The installed

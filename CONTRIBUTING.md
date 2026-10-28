@@ -36,7 +36,7 @@ When you add a feature or fix a bug, add a test that fails without your change:
 
 ## Code standards
 
-- **C++17**, formatted to match the surrounding code.
+- **C++20**, formatted to match the surrounding code.
 - **Warnings are errors in spirit**: the build uses `/W4` (MSVC) or `-Wall -Wextra -Wpedantic` (GCC/Clang). Your change must not add warnings. You can enforce this locally with `-DSDFGEN_WARNINGS_AS_ERRORS=ON`.
 - **Keep the CPU and GPU paths in agreement.** `test_correctness` compares them: zero sign mismatches, near-band agreement within half a cell. If you change one path, check the other.
 - **No dead code.** Do not commit commented-out code or unused parameters.
